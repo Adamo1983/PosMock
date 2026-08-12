@@ -2,7 +2,38 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!--
+      Esenzione dalle ottimizzazioni di batteria, come in Ermes. Richiesta a
+      runtime con ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (serve comunque
+      l'OK dell'utente). Senza, sugli OEM aggressivi (Samsung One UI in primis)
+      il sistema sospende l'app dopo qualche minuto di schermo spento: il
+      terminale simulato smette di rispondere e il banco di prova diventa esso
+      stesso la causa del guasto che si sta cercando.
+      Nota distribuzione: Google Play limita questo permesso a casi specifici.
+      PosMock e' uno strumento interno, non passa dallo store.
+    -->
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:ignore="BatteryLife" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+      Serve solo per copiare il log in Download/PosMock/ su Android 9 e
+      precedenti: da Android 10 la stessa cosa si fa via MediaStore senza
+      chiedere niente all'utente.
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"
+        tools:ignore="ScopedStorage" />
+
     <application
+        android:name=".PosMockApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -12,7 +43,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PosMock">
         <activity
-            android:name=".MainActivity"
+            android:name=".presentation.activity.MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.PosMock"
@@ -23,6 +54,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            specialUse e non dataSync: su Android 15 un FGS dataSync viene fermato
+            dopo 6 ore complessive nelle 24, e un banco di prova puo' restare acceso
+            per un turno intero. L'app non passa dallo store, quindi la revisione
+            della categoria non e' un problema.
+        -->
+        <service
+            android:name=".service.MockServerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Simulatore di terminale POS per test di integrazione: tiene
+                    aperto un server TCP mentre lo schermo e' spento" />
+        </service>
     </application>
 
 </manifest>

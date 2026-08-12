@@ -1,4 +1,4 @@
-package it.primesoftware.posmock.ui.theme
+package it.primesoftware.posmock.presentation.theme
 
 import androidx.compose.ui.graphics.Color
 
