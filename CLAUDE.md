@@ -14,6 +14,20 @@ quello che risponde dopo un minuto, quello che chiude la connessione a meta' tra
 gli scenari da cui nasce il pagamento orfano (`../UniquePosManager/doc/pagamenti-orfani.md`,
 `../Ermes/doc/analisi-pagamento-pos-orfano.md`).
 
+## Stato al 14/08/2026
+
+**ZVT è validato contro il middleware vero. IAE37 no**: il codice c'è tutto (status `t`,
+pagamento `P`, esito `E`, i cinque esiti mock) ma non è mai stato messo davanti a
+UniquePosManager. Il collaudo è il §1 di `../UniquePosManager/doc/piano-test-1.0.3.md`, e i due
+passi che contano sono:
+
+1. **lo status `t`** — il middleware lo interroga con 5s di timeout prima di *ogni* pagamento e
+   senza risposta valida dichiara `PosBusy`: finché non passa quello, di IAE37 non si prova
+   nient'altro;
+2. **la calibrazione dell'importo** — `Iae37Messages.AMOUNT_OFFSET = 23` è dedotto da **una sola
+   cattura** (0,05 €). Due pagamenti di importo diverso lo confermano o danno subito il valore
+   giusto; è l'unica costante da correggere.
+
 ## Da leggere a inizio sessione
 
 - [doc/struttura-app.md](doc/struttura-app.md) — mappa dell'architettura e file chiave.
