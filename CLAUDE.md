@@ -64,6 +64,7 @@ Le prove contro il middleware vero le fa l'utente.
 
 1. Avvia il servizio in PosMock e leggi l'indirizzo mostrato nella schermata Configurazione.
 2. Lato middleware, in `posList.cfg`: `PosMock:<ip del telefono>:<porta>`.
-3. In `protocol.cfg`: `zvt` (simulazione vera) oppure `iae37` (solo registrazione dei byte).
+3. In `protocol.cfg`: `zvt` oppure `iae37` — **entrambi simulati per davvero** (status, pagamento,
+   esiti). La modalita' `raw` registra e basta, e serve per i protocolli ancora da capire.
 4. Telefono e PC devono stare sulla stessa rete, e il middleware fa un **ping ICMP** prima di
    collegarsi: se la rete lo blocca, disattivare il ping per quel POS.

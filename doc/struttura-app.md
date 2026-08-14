@@ -7,7 +7,8 @@
 
 Simulatore di terminale POS. Apre un `ServerSocket` sulla porta scelta e serve le connessioni
 del middleware (UniquePosManager / PosManagerKtorDe) come farebbe un terminale vero. Due
-protocolli: **ZVT** simulato per davvero, **IAE37** solo registrato (vedi sotto).
+protocolli **entrambi simulati**, ZVT e IAE37 (vedi "I tre protocolli"); la modalita' `raw`
+registra soltanto, ed e' lo strumento con cui IAE37 e' stato ricostruito.
 
 ## Configurazione
 
