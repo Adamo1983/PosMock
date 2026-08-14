@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -53,6 +54,12 @@ fun ConfigScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            // L'activity e' edge-to-edge, quindi `adjustResize` del manifest non
+            // rimpicciolisce piu' la finestra all'apertura della tastiera: senza
+            // questo, l'IME copre il campo del ritardo invece di farlo scorrere
+            // in alto. Con la lista accorciata, il campo che prende il fuoco ci
+            // scorre da solo.
+            .imePadding()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(vertical = 16.dp),
