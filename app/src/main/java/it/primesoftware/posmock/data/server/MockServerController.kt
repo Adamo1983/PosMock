@@ -21,6 +21,7 @@ import it.primesoftware.posmock.service.MockServerService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +29,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -106,6 +108,14 @@ class MockServerController(
                 // voluto, non un errore da mostrare in rosso.
                 if (isActive) {
                     val message = e.message ?: e.javaClass.simpleName
+                    // Qui il loop e' saltato per conto suo — l'interfaccia di rete
+                    // caduta, tipicamente. Nessuno serve piu' la porta, quindi lock
+                    // e connessioni vanno lasciati andare adesso: senza, restavano
+                    // presi fino alla morte del processo, con il pulsante in app
+                    // tornato a "Avvia" e il wake lock ancora in mano. Il foreground
+                    // service si ferma da solo, che lo stato Error lo vede passare.
+                    closeAllSockets()
+                    releaseLocks()
                     _state.value = ServerState.Error(message)
                     log.log(LogDirection.ERROR, "Server fermato: $message")
                 }
@@ -115,10 +125,18 @@ class MockServerController(
         }
     }
 
-    override fun stop() {
+    /**
+     * NonCancellable: una pulizia interrotta a meta' e' peggio di nessuna pulizia.
+     *
+     * Chi chiama vive in scope che muoiono per conto loro — il `viewModelScope`
+     * alla rotazione dello schermo, quello del service quando il service si
+     * ferma. Senza questa protezione, chiudere l'app subito dopo aver premuto
+     * "Ferma" lascerebbe il wake lock in mano fino alla morte del processo.
+     */
+    override suspend fun stop(): Unit = withContext(NonCancellable) {
         val job = serverJob ?: run {
             _state.value = ServerState.Stopped
-            return
+            return@withContext
         }
         serverJob = null
 
@@ -126,16 +144,27 @@ class MockServerController(
         serverSocket = null
         closeAllSockets()
 
-        // runBlocking su un solo cancelAndJoin: l'accept e' gia' saltato con la
-        // close qui sopra, quindi l'attesa e' istantanea e ci garantisce che al
-        // ritorno da stop() la porta sia davvero libera per un riavvio immediato.
-        runBlocking { runCatching { job.cancelAndJoin() } }
+        // L'accept e' gia' saltato con la close qui sopra, quindi l'attesa e'
+        // istantanea e ci garantisce che al ritorno da stop() la porta sia davvero
+        // libera per un riavvio immediato. Il tetto resta per il caso in cui un
+        // handler non esca comunque: meglio una porta ancora occupata al prossimo
+        // avvio, purche' scritto nel log — cosi' l'"Address already in use" che
+        // seguirebbe ha una riga che lo spiega.
+        if (withTimeoutOrNull(STOP_JOIN_TIMEOUT_MS) { job.cancelAndJoin() } == null) {
+            log.log(
+                LogDirection.ERROR,
+                "Arresto non completato entro $STOP_JOIN_TIMEOUT_MS ms: " +
+                    "la porta potrebbe risultare ancora occupata al prossimo avvio",
+            )
+        }
 
         releaseLocks()
-        stopService()
         _activeConnections.value = 0
         _state.value = ServerState.Stopped
         log.log(LogDirection.INFO, "Server fermato")
+        // Per ultimo: fermare il service fa partire il suo onDestroy, che cancella
+        // lo scope da cui questa stessa stop() puo' essere stata lanciata.
+        stopService()
     }
 
     private suspend fun serveConnection(socket: Socket, peer: String, handler: ProtocolHandler) {
@@ -176,6 +205,10 @@ class MockServerController(
 
     @Suppress("DEPRECATION")
     private fun acquireLocks() {
+        // Un lock preso due volte perde il riferimento al primo, che resta in mano
+        // fino alla morte del processo: rilasciare prima costa nulla se non c'e'
+        // niente da rilasciare, e chiude la porta a quel caso.
+        releaseLocks()
         runCatching {
             val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG)
@@ -210,5 +243,8 @@ class MockServerController(
     private companion object {
         const val WAKE_LOCK_TAG = "PosMock::server"
         const val WIFI_LOCK_TAG = "PosMock::wifi"
+
+        /** Come il drain() di Ermes: oltre, meglio un pulsante che risponde. */
+        const val STOP_JOIN_TIMEOUT_MS = 2_000L
     }
 }

@@ -20,5 +20,13 @@ interface IServerController {
     /** Si mette in ascolto con la configurazione corrente di [IConfigStore]. */
     fun start()
 
-    fun stop()
+    /**
+     * Chiude tutto e torna [ServerState.Stopped].
+     *
+     * E' sospendibile perche' aspetta davvero che l'accept loop sia finito: al
+     * ritorno la porta e' libera per un riavvio immediato. Chi la chiama non
+     * puo' interromperla a meta' — l'implementazione protegge la pulizia — ma
+     * deve avere uno scope in cui lanciarla.
+     */
+    suspend fun stop()
 }

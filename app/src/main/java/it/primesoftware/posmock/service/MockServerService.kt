@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
 import it.primesoftware.posmock.R
@@ -43,14 +44,24 @@ class MockServerService : Service() {
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        // L'errore della sessione precedente e' storia vecchia: se restasse in
+        // tendina accanto alla notifica del server appena riacceso direbbe due
+        // cose in contraddizione.
+        notificationManager().cancel(ERROR_NOTIFICATION_ID)
         startForegroundWithNotification(buildNotification("Avvio in corso…"))
         observeState()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            serverController.stop()
-            stopSelf()
+            // stopSelf() dopo l'arresto, non prima: se il service morisse subito,
+            // il suo onDestroy cancellerebbe lo scope in cui gira la pulizia. Di
+            // norma non ci arriva nemmeno, perche' e' stop() stessa a fermare il
+            // service alla fine; serve al caso in cui non ci sia niente da fermare.
+            scope.launch {
+                serverController.stop()
+                stopSelf()
+            }
             return START_NOT_STICKY
         }
         // START_NOT_STICKY: se il sistema ci uccide non ha senso resuscitare il
@@ -68,17 +79,38 @@ class MockServerService : Service() {
     private fun observeState() {
         scope.launch {
             serverController.state.collectLatest { state ->
-                val text = when (state) {
+                when (state) {
                     is ServerState.Running ->
-                        "${state.protocol.label} in ascolto sulla porta ${state.port}"
+                        updateNotification(
+                            "${state.protocol.label} in ascolto sulla porta ${state.port}"
+                        )
 
-                    ServerState.Starting -> "Avvio in corso…"
-                    ServerState.Stopped -> "Server fermo"
-                    is ServerState.Error -> "Errore: ${state.message}"
+                    ServerState.Starting -> updateNotification("Avvio in corso…")
+                    ServerState.Stopped -> updateNotification("Server fermo")
+                    is ServerState.Error -> reportErrorAndStop(state.message)
                 }
-                notificationManager().notify(NOTIFICATION_ID, buildNotification(text))
             }
         }
+    }
+
+    private fun updateNotification(text: String) {
+        notificationManager().notify(NOTIFICATION_ID, buildNotification(text))
+    }
+
+    /**
+     * Il server e' morto per conto suo: il service non ha piu' niente da tenere
+     * vivo e si toglie di mezzo.
+     *
+     * L'errore pero' deve restare sotto gli occhi anche a schermo spento — un
+     * banco che sparisce in silenzio e' esattamente il modo in cui si finisce a
+     * cercare il guasto dalla parte sbagliata. Per questo la notifica d'errore e'
+     * **separata** da quella del foreground service: quella viene portata via
+     * dal sistema quando il service muore, questa no. Ed e' scartabile, perche'
+     * a differenza dell'altra non c'e' piu' niente da fermare.
+     */
+    private fun reportErrorAndStop(message: String) {
+        notificationManager().notify(ERROR_NOTIFICATION_ID, buildErrorNotification(message))
+        stopSelf()
     }
 
     private fun startForegroundWithNotification(notification: Notification) {
@@ -93,13 +125,25 @@ class MockServerService : Service() {
         }
     }
 
+    private fun openAppIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+
+    private fun buildErrorNotification(message: String): Notification =
+        Notification.Builder(this, CHANNEL_ID)
+            .setContentTitle("${getString(R.string.app_name)}: server fermato")
+            .setContentText(message)
+            .setStyle(Notification.BigTextStyle().bigText(message))
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentIntent(openAppIntent())
+            .setAutoCancel(true)
+            .build()
+
     private fun buildNotification(text: String): Notification {
-        val openApp = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+        val openApp = openAppIntent()
         val stop = PendingIntent.getService(
             this,
             1,
@@ -113,8 +157,11 @@ class MockServerService : Service() {
             .setContentIntent(openApp)
             .setOngoing(true)
             .addAction(
-                Notification.Action.Builder(null as android.graphics.drawable.Icon?, "Ferma", stop)
-                    .build()
+                Notification.Action.Builder(
+                    Icon.createWithResource(this, R.drawable.ic_stop),
+                    "Ferma",
+                    stop,
+                ).build()
             )
             .build()
     }
@@ -138,5 +185,9 @@ class MockServerService : Service() {
         const val ACTION_STOP = "it.primesoftware.posmock.STOP_SERVER"
         private const val CHANNEL_ID = "posmock_server"
         private const val NOTIFICATION_ID = 1
+
+        // Id distinto: la notifica del foreground service se ne va con il service,
+        // e l'errore deve sopravvivergli.
+        private const val ERROR_NOTIFICATION_ID = 2
     }
 }

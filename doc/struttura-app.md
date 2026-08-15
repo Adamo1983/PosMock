@@ -1,7 +1,7 @@
 # Struttura dell'app PosMock
 
 > Mappa dell'architettura per riprendere il contesto senza rileggere il codice.
-> Ultimo aggiornamento: 12/08/2026 (v1.0)
+> Ultimo aggiornamento: 15/08/2026 (v1.0)
 
 ## Cos'e'
 
@@ -103,6 +103,9 @@ di Ermes:
 L'ordine dei dialog all'avvio conta: prima le notifiche, poi la batteria, il secondo lanciato
 dal callback del primo. Insieme si coprirebbero a vicenda.
 
+Le quattro difese tengono in piedi il processo, ma non impediscono al server di morire per conto
+suo: quel caso e' in "Quando il server muore da solo", piu' sotto.
+
 ## Le tre schermate
 
 **Stato** e' quella di comando: stato del server a caratteri grandi, indirizzo da ribattere in
@@ -150,6 +153,40 @@ Due dettagli che non sono opzionali:
 coroutine**. `stop()` quindi chiude prima il `ServerSocket` e tutte le socket aperte (le
 letture saltano con eccezione), poi fa il `cancelAndJoin`. L'ordine non e' invertibile: al
 contrario, `stop()` tornerebbe con la porta ancora occupata e un riavvio immediato fallirebbe.
+
+`stop()` e' **`suspend`**: aspetta davvero la fine dell'accept loop, cosi' al ritorno la porta
+e' libera. Chi la chiama la lancia in uno scope — `viewModelScope` dalla schermata Stato,
+quello del service dall'azione della notifica. Tre dettagli che non sono opzionali:
+
+- **Il corpo gira in `NonCancellable`.** Gli scope che la ospitano muoiono per conto loro: il
+  `viewModelScope` alla rotazione dello schermo, quello del service quando il service si ferma.
+  Senza, chiudere l'app subito dopo aver premuto "Ferma" cancellerebbe la coroutine sul
+  `cancelAndJoin` e salterebbe il `releaseLocks()` — wake lock in mano fino alla morte del
+  processo. **Una pulizia interrotta a meta' e' peggio di nessuna pulizia.**
+- **L'attesa ha un tetto di 2s**, come il `flush()` del log, e se scatta finisce nel log: cosi'
+  l'`Address already in use` del riavvio successivo ha una riga che lo spiega.
+- **`stopService()` e' l'ultima istruzione**, dopo lo stato e il log. Fermare il service fa
+  partire il suo `onDestroy`, che cancella lo scope in cui quella stessa pulizia sta girando.
+
+## Quando il server muore da solo
+
+Altra cosa dall'arresto voluto: l'interfaccia di rete cade e l'`accept()` salta mentre il banco
+e' acceso. Il ramo d'errore di `start()` chiude le connessioni e rilascia i lock sul posto —
+prima restavano presi fino alla morte del processo, con il pulsante in app tornato a "Avvia" e
+il wake lock ancora in mano — e lascia lo stato a `Error`.
+
+Il foreground service, che quello stato lo vede passare, si ferma da solo. Prima pero' lascia in
+tendina una notifica d'errore **con un id diverso** dalla sua: quella del service il sistema se
+la porta via quando il service muore, questa no. E' scartabile, perche' a quel punto non c'e'
+piu' niente da fermare, e la cancella l'`onCreate` del prossimo avvio — due notifiche che si
+contraddicono sono peggio di nessuna.
+
+⚠️ La seconda notifica non e' un vezzo. Senza, una caduta di rete a schermo spento lascerebbe il
+telefono muto e in apparenza a posto: **e' esattamente lo sparire in silenzio che le quattro
+difese esistono per impedire**, solo per un'altra strada.
+
+Nota di simmetria: `acquireLocks()` fa un `releaseLocks()` difensivo in testa. Un lock preso due
+volte perde il riferimento al primo, che resta preso per sempre.
 
 ## Gli esiti (`MockOutcome`)
 

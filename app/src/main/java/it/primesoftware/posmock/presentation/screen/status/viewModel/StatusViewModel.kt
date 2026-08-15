@@ -70,7 +70,10 @@ class StatusViewModel(
 
     fun onToggleServerClicked() {
         if (serverController.state.value.isActive) {
-            serverController.stop()
+            // L'arresto aspetta che l'accept loop sia finito, quindi e' sospendibile.
+            // Se lo scope muore prima — schermo ruotato, app chiusa — la pulizia va
+            // avanti lo stesso: se ne occupa il controller.
+            viewModelScope.launch { serverController.stop() }
         } else {
             serverController.start()
         }
