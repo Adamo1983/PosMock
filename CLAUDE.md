@@ -53,9 +53,16 @@ passi che contano sono:
 - **Lo status IAE37 (`t`) e' il guardiano**: il middleware lo interroga con 5s di timeout prima
   di ogni pagamento e senza risposta valida dichiara `PosBusy` — la richiesta di pagamento non
   parte nemmeno.
-- **I due silenzi sono cose diverse.** "Nessuna risposta" (prima dell'ACK) fa dichiarare POS
-  occupato in 5 secondi; "ACK e poi silenzio" lascia tutti appesi ed e' il modo in cui nasce
-  un incasso orfano. Chi tocca `ZvtTerminalHandler` deve tenerli distinti.
+- **I tre silenzi sono cose diverse.** "Nessuna risposta" (prima dell'ACK) fa dichiarare POS
+  occupato in 5 secondi; "ACK e poi silenzio" lascia tutti appesi sul pagamento ed e' il modo
+  in cui nasce un incasso orfano; **"Muto dopo l'ACK di registrazione"** (opzione a parte, non
+  un esito) blocca la cassa prima ancora che un pagamento parta. Chi tocca
+  `ZvtTerminalHandler` deve tenerli distinti.
+- **Il keep-alive non deve entrare nei silenzi.** Durante l'attesa dell'esito il mock manda uno
+  stato intermedio ogni 10 s, perche' altrimenti una transazione lenta ma viva sarebbe
+  indistinguibile da un terminale morto. Si ferma pero' **prima** che l'esito parta: se
+  finisse per coprire anche i silenzi qui sopra, il mock smetterebbe di saper riprodurre il
+  guasto per cui esiste.
 - **Il server e' un singleton di processo, non vive nel service.** Il foreground service
   serve solo a tenere vivo il processo e a mostrare la notifica.
 - **Le quattro difese contro Doze non si tolgono** (foreground service, wake lock, wifi lock,

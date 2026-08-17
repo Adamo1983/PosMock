@@ -58,8 +58,15 @@ timeout sull'autorizzazione.
 Conseguenza diretta, ed e' il motivo per cui questa app esiste:
 
 - tacere **prima** dell'ACK → il middleware dichiara `PosBusy` in ~5s;
-- tacere **dopo** l'ACK → il middleware resta appeso, il palmare va in timeout a 90s e nessuno
-  sa se la carta e' stata addebitata. E' l'**incasso orfano**.
+- tacere **dopo** l'ACK del pagamento → il middleware resta appeso, il palmare va in timeout a
+  90s e nessuno sa se la carta e' stata addebitata. E' l'**incasso orfano**;
+- tacere **dopo l'ACK della registrazione** → il peggiore dei tre, e per questo ha un'opzione
+  sua ("Muto dopo l'ACK di registrazione", separata dall'esito). La cassa entra in slave mode
+  prima ancora di mandare un pagamento: `RegistrationApdu` non sovrascrive
+  `SendsCompletionPacket`, quindi in `InternalIsCompletionPacket` la risposta `80 00` mette
+  gia' `MasterMode = false`. Chi aspetta l'esito della registrazione prima di dichiarare il POS
+  occupato — `UniquePosManager` fa `await initTask` dentro `ZvtBridge` — con la libreria
+  vecchia non rispondeva **affatto**, nemmeno `PosBusy`.
 
 > **Aggiornamento 16-17/08/2026.** In slave mode la libreria non aspetta piu' per sempre:
 > `SLAVE_MODE_RESPONSE_TIMEOUT` vale **180 s** (sia su `NetworkTransport` sia, dal 17/08, su

@@ -157,6 +157,11 @@ private fun SummaryCard(uiState: StatusUiState) {
         if (config.protocol == MockProtocol.RAW) {
             InfoRow("Risposta raw", config.rawReplyMode.label)
         }
+        // Si mostra solo quando e' acceso, e proprio per quello: e' l'unica opzione che
+        // impedisce ai pagamenti di partire, e da qui si capisce subito perche'.
+        if (config.hangAfterRegistrationAck && config.protocol == MockProtocol.ZVT) {
+            InfoRow("Registrazione", "Muta dopo l'ACK")
+        }
         Text(
             text = if (uiState.isRunning) {
                 "Il servizio e' acceso: le modifiche alla porta e al protocollo " +

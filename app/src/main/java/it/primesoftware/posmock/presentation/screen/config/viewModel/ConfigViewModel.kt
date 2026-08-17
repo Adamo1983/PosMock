@@ -34,6 +34,7 @@ sealed interface ConfigAction {
     data class OutcomeSelected(val outcome: MockOutcome) : ConfigAction
     data class DelayChanged(val text: String) : ConfigAction
     data class AskEachTimeChanged(val enabled: Boolean) : ConfigAction
+    data class HangAfterRegistrationAckChanged(val enabled: Boolean) : ConfigAction
     data class RawModeSelected(val mode: RawReplyMode) : ConfigAction
     data class RawHexChanged(val text: String) : ConfigAction
 }
@@ -100,6 +101,9 @@ class ConfigViewModel(
             }
 
             is ConfigAction.AskEachTimeChanged -> persist { it.copy(askEachTime = action.enabled) }
+
+            is ConfigAction.HangAfterRegistrationAckChanged ->
+                persist { it.copy(hangAfterRegistrationAck = action.enabled) }
 
             is ConfigAction.RawModeSelected -> persist { it.copy(rawReplyMode = action.mode) }
 

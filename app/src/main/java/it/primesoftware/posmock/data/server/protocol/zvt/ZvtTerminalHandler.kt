@@ -42,12 +42,18 @@ import java.util.concurrent.atomic.AtomicLong
  * e' cosi' che la cassa distingue "carta rifiutata" da "andata a buon fine".
  *
  * ⚠️ Il dettaglio che rende utile questo mock: **dopo il primo ACK la cassa
- * smette di applicare timeout** e resta in attesa a tempo indeterminato (nella
- * libreria e' il passaggio `masterMode = false`). Prima dell'ACK invece la
- * finestra e' di pochi secondi. Da qui i due silenzi simulabili, che sono cose
- * diverse: [MockOutcome.NoAck] fa dichiarare "POS occupato" in 5 secondi,
- * [MockOutcome.HangAfterAck] lascia tutti appesi ed e' il modo in cui nasce un
- * incasso orfano.
+ * applica un'attesa molto piu' lunga** (nella libreria e' il passaggio
+ * `masterMode = false`; fino al 16/08/2026 era addirittura senza limite). Prima
+ * dell'ACK invece la finestra e' di pochi secondi. Da qui i **tre** silenzi
+ * simulabili, che sono cose diverse fra loro:
+ *
+ * - [MockOutcome.NoAck] — muto da subito: "POS occupato" in 5 secondi;
+ * - [MockOutcome.HangAfterAck] — ACK e poi silenzio **sul pagamento**: e' il modo
+ *   in cui nasce un incasso orfano;
+ * - [ServerConfig.hangAfterRegistrationAck] — ACK e poi silenzio **sulla
+ *   registrazione**: la cassa entra in slave mode prima ancora di mandare un
+ *   pagamento, ed e' il caso in cui il vecchio `Timeout.Infinite` faceva piu'
+ *   danno.
  */
 class ZvtTerminalHandler(
     private val log: ILogRepository,
@@ -115,6 +121,21 @@ class ZvtTerminalHandler(
         }
 
         send(output, ZvtMessages.ack(), "ACK")
+
+        // Il terzo silenzio, e il peggiore dei tre: qui l'ACK e' gia' partito, quindi la
+        // cassa e' in slave mode PRIMA di aver mandato un pagamento. Non e' una sfumatura:
+        // il chiamante resta fermo dentro la registrazione, e chi aspetta l'esito della
+        // registrazione prima di dichiarare il POS occupato (UniquePosManager fa
+        // `await initTask`) non risponde piu' del tutto. Vedi ServerConfig.
+        if (config.hangAfterRegistrationAck) {
+            log.log(
+                LogDirection.ERROR,
+                "Registrazione: ACK mandato e poi silenzio. La cassa e' gia' in slave mode " +
+                    "e nessun pagamento partira'.",
+            )
+            awaitCancellation()
+        }
+
         send(output, ZvtMessages.completion(statusByte = 0x00), "Completion (nessuna init/diagnosi richiesta)")
         awaitAck(socket, input)
         log.log(LogDirection.INFO, "Terminale registrato da $peer")

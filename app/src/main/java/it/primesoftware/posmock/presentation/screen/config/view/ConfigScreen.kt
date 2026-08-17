@@ -194,6 +194,38 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // Sta in fondo e con un avviso perche' e' l'unica opzione che agisce PRIMA del
+        // pagamento: lasciata accesa per sbaglio, ogni prova successiva fallisce alla
+        // registrazione e sembra un guasto della cassa.
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Muto dopo l'ACK di registrazione", style = MaterialTheme.typography.bodyLarge)
+                Text(
+                    text = "Solo ZVT. Il terminale ACKa la registrazione e poi tace: " +
+                        "la cassa si blocca prima ancora di mandare il pagamento",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (uiState.config.hangAfterRegistrationAck) {
+                    Text(
+                        text = "Acceso: nessun pagamento partira'. Spegnilo per gli altri test.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            Switch(
+                checked = uiState.config.hangAfterRegistrationAck,
+                onCheckedChange = { onAction(ConfigAction.HangAfterRegistrationAckChanged(it)) },
+            )
+        }
     }
 }
 

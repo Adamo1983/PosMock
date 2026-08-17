@@ -38,6 +38,9 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
             defaultOutcome = loadOutcome(default.defaultOutcome),
             responseDelayMs = prefs.getLong(KEY_DELAY, default.responseDelayMs),
             askEachTime = prefs.getBoolean(KEY_ASK_EACH_TIME, default.askEachTime),
+            hangAfterRegistrationAck = prefs.getBoolean(
+                KEY_HANG_AFTER_REG_ACK, default.hangAfterRegistrationAck
+            ),
             rawReplyMode = prefs.getString(KEY_RAW_MODE, null)
                 ?.let { name -> RawReplyMode.entries.firstOrNull { it.name == name } }
                 ?: default.rawReplyMode,
@@ -53,6 +56,7 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
             .putInt(KEY_OUTCOME_ERROR, (config.defaultOutcome as? MockOutcome.Decline)?.error?.zvtCode ?: -1)
             .putLong(KEY_DELAY, config.responseDelayMs)
             .putBoolean(KEY_ASK_EACH_TIME, config.askEachTime)
+            .putBoolean(KEY_HANG_AFTER_REG_ACK, config.hangAfterRegistrationAck)
             .putString(KEY_RAW_MODE, config.rawReplyMode.name)
             .putString(KEY_RAW_HEX, config.rawReplyHex)
             .apply()
@@ -89,6 +93,7 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
         const val KEY_OUTCOME_ERROR = "default_outcome_error"
         const val KEY_DELAY = "response_delay_ms"
         const val KEY_ASK_EACH_TIME = "ask_each_time"
+        const val KEY_HANG_AFTER_REG_ACK = "hang_after_registration_ack"
         const val KEY_RAW_MODE = "raw_reply_mode"
         const val KEY_RAW_HEX = "raw_reply_hex"
 
