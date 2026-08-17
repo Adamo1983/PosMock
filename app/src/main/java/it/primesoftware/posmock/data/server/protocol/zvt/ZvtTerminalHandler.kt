@@ -10,8 +10,12 @@ import it.primesoftware.posmock.domain.model.DeclineReason
 import it.primesoftware.posmock.domain.repository.ILogRepository
 import it.primesoftware.posmock.domain.repository.IOutcomeProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.io.OutputStream
@@ -154,12 +158,17 @@ class ZvtTerminalHandler(
         )
         awaitAck(socket, input)
 
-        if (config.responseDelayMs > 0 && !config.askEachTime) {
-            log.log(LogDirection.INFO, "Attendo ${config.responseDelayMs} ms prima di rispondere")
-            delay(config.responseDelayMs)
-        }
+        // Le due attese qui sotto sono l'unico momento in cui il terminale simulato e'
+        // vivo e sta lavorando, quindi vanno coperte dal keep-alive: senza, un'attesa
+        // lunga e' silenzio puro e la cassa la tratta come un terminale muto.
+        val outcome = withKeepAlive(socket, input, output) {
+            if (config.responseDelayMs > 0 && !config.askEachTime) {
+                log.log(LogDirection.INFO, "Attendo ${config.responseDelayMs} ms prima di rispondere")
+                delay(config.responseDelayMs)
+            }
 
-        val outcome = outcomeProvider.decide(request)
+            outcomeProvider.decide(request)
+        }
         log.log(LogDirection.INFO, "Esito scelto: ${outcome.label}")
 
         when (outcome) {
@@ -223,6 +232,47 @@ class ZvtTerminalHandler(
         )
     }
 
+    /**
+     * Esegue [block] mandando nel frattempo uno stato intermedio ogni
+     * [KEEP_ALIVE_INTERVAL_MS], come fa un terminale vero mentre il cliente e'
+     * ancora al POS.
+     *
+     * Serve a rendere distinguibili le due cose che per la cassa si assomigliano:
+     * una transazione **lenta ma viva** e un terminale **muto**. La libreria ZVT
+     * misura il silenzio, non la durata, e riparte a ogni pacchetto ricevuto:
+     * senza questi pacchetti un'attesa di qualche minuto scade esattamente come
+     * se il POS fosse morto, e si finisce per bocciare la cassa per colpa del
+     * banco di prova.
+     *
+     * Il keep-alive si ferma **prima** che parta l'esito, quindi i due silenzi
+     * simulabili ([MockOutcome.NoAck] e [MockOutcome.HangAfterAck]) restano
+     * silenzi veri: la differenza fra i due non viene toccata.
+     */
+    private suspend fun <T> withKeepAlive(
+        socket: Socket,
+        input: InputStream,
+        output: OutputStream,
+        block: suspend () -> T,
+    ): T = coroutineScope {
+        val keepAlive = launch {
+            while (true) {
+                delay(KEEP_ALIVE_INTERVAL_MS)
+                send(output, ZvtMessages.intermediateStatus(), "Intermediate status (keep-alive)")
+                awaitAck(socket, input)
+            }
+        }
+
+        try {
+            block()
+        } finally {
+            // cancelAndJoin e non cancel: la cancellazione non interrompe una write
+            // gia' partita, e due coroutine che scrivono insieme sullo stesso stream
+            // intrecciano i byte di due TPDU — cioe' il tipo di guasto che in questo
+            // protocollo non da' errore ma disallinea tutto quello che segue.
+            withContext(NonCancellable) { keepAlive.cancelAndJoin() }
+        }
+    }
+
     private suspend fun send(output: OutputStream, bytes: ByteArray, description: String) {
         withContext(Dispatchers.IO) { ZvtCodec.write(output, bytes) }
         log.log(LogDirection.TX, description, ZvtCodec.toHex(bytes))
@@ -262,5 +312,13 @@ class ZvtTerminalHandler(
 
     private companion object {
         const val ACK_TIMEOUT_MS = 5_000
+
+        /**
+         * Ogni quanto mandare lo stato intermedio durante un'attesa lunga. Dieci
+         * secondi stanno comodamente sotto i 180 s di silenzio che la libreria ZVT
+         * tollera, e sono nell'ordine di grandezza di un terminale vero (nei log di
+         * campo arrivano ogni 2-10 s).
+         */
+        const val KEEP_ALIVE_INTERVAL_MS = 10_000L
     }
 }

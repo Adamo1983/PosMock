@@ -49,17 +49,42 @@ gli ACK che il mock consuma con `awaitAck`.
 
 ## I due vincoli che contano
 
-**1. Il timeout esiste solo prima del primo ACK.**
+**1. Prima e dopo il primo ACK sono due mondi diversi.**
 `NetworkTransport.receiveResponsePacket` applica 2 secondi finche' `masterMode` e' `true`;
-appena arriva un pacchetto `80 00` la libreria mette `masterMode = false` e da li' in poi
-**aspetta senza limiti**. Lato C# il `ZvtBridge` mette 5s sulla registrazione e nessun timeout
-sull'autorizzazione.
+appena arriva un pacchetto `80 00` la libreria mette `masterMode = false`, e da li' in poi
+l'attesa e' molto piu' lunga. Lato C# il `ZvtBridge` mette 5s sulla registrazione e nessun
+timeout sull'autorizzazione.
 
 Conseguenza diretta, ed e' il motivo per cui questa app esiste:
 
 - tacere **prima** dell'ACK → il middleware dichiara `PosBusy` in ~5s;
-- tacere **dopo** l'ACK → non se ne esce: il middleware resta appeso, il palmare va in timeout
-  a 90s e nessuno sa se la carta e' stata addebitata. E' l'**incasso orfano**.
+- tacere **dopo** l'ACK → il middleware resta appeso, il palmare va in timeout a 90s e nessuno
+  sa se la carta e' stata addebitata. E' l'**incasso orfano**.
+
+> **Aggiornamento 16-17/08/2026.** In slave mode la libreria non aspetta piu' per sempre:
+> `SLAVE_MODE_RESPONSE_TIMEOUT` vale **180 s** (sia su `NetworkTransport` sia, dal 17/08, su
+> `RS232Transport`), e la DLL aggiornata e' anche in `UniquePosManager/Libs/`. Il difetto
+> nasceva da un `Timeout.Infinite` che teneva il chiamante appeso e lasciava il terminale
+> "occupato" fino al riavvio dell'applicazione: vedi
+> `../GianoITA/Docs/BUGFIX-POS-OCCUPATO-ZVT.md`.
+>
+> **Quel timeout misura il silenzio, non la durata**: riparte a ogni pacchetto ricevuto. E'
+> il motivo per cui il mock manda un keep-alive durante le attese lunghe (sotto): senza,
+> una transazione lenta ma viva sarebbe indistinguibile da un terminale morto, e il test la
+> boccerebbe.
+
+**1-bis. Il keep-alive durante le attese lunghe.**
+Mentre aspetta il ritardo configurato o la scelta dell'utente, `ZvtTerminalHandler` manda un
+`04 FF` ogni **10 s** (`KEEP_ALIVE_INTERVAL_MS`), come fa un terminale vero mentre il cliente
+e' ancora al POS — nei log di campo arrivano ogni 2-10 s.
+
+Il keep-alive si ferma **prima** che parta l'esito, quindi non intacca i due silenzi
+simulabili: "Nessuna risposta" e "ACK e poi silenzio" restano silenzi veri.
+
+Effetto pratico: con esito **Approvato**, `askEachTime` **spento** e un ritardo di 240.000 ms
+si ottiene una transazione **lenta ma viva oltre i 180 s**, senza toccare il telefono. E' la
+prova che nessun timeout scatti a sproposito, ed e' l'unica che puo' bocciare il lavoro sui
+timeout — quella del terminale muto e' la piu' facile.
 
 **2. Le lunghezze dei parametri non viaggiano sul filo.**
 `LoadParameterHelper.loadParameters` scorre i dati leggendo un BMP e poi **tanti byte quanti
