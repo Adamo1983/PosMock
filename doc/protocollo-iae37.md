@@ -83,6 +83,19 @@ richiesta `P` non viene mai mandata. Finche' il mock non rispondeva a `t`, di IA
 poteva provare nient'altro — e nel log non compariva neppure l'importo, perche' lo status non lo
 porta.
 
+⚠️ **Il guardiano e' del middleware, non del protocollo.** Sulla tratta diretta Giano ↔ PosMock
+non c'e' nessun pre-flight da 5 secondi: Giano applica `IAE37_SetTimeout` una volta sola, dentro
+`CreateAndInitializeWrapper` (`IngenicoIAE37CreditCardTerminalDevice.cs:120`), quindi lo **stesso**
+timeout vale per ogni operazione sulla DLL, `StatoPos` compreso. Il valore e'
+`PaymentReadTimeoutSeconds = 60` — sessanta **secondi** per lettura, per tre letture: 180s, che
+devono restare sotto il watchdog dei 200s (`PaymentTimeoutMs`). Conseguenza pratica: uno status
+muto che sul middleware costa 5 secondi, su Giano ne costa fino a 180.
+
+> Attenzione all'unita' se si va a leggere il wrapper: il parametro si chiama
+> `SetTimeout(int timeoutMs)` (`IAE37Wrapper.cs:431`) ma il commento sopra dice che la DLL vuole
+> **secondi**, ed e' l'aritmetica 60×3 &lt; 200 a dire chi ha ragione. Chi un giorno passasse
+> millisecondi credendo al nome porterebbe il timeout a 60 ms.
+
 ## Tracciato dello status esteso (`t`), 225 byte
 
 | Campo | Byte | Esempio |

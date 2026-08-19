@@ -324,12 +324,15 @@ onDestroy()         su stopSelf(), stopService(), o kill del sistema
     # ------------------------------------------------------------------ 6
     s.append(p("6. PosMock: il guasto da cui nasce tutto", h1))
     s.append(p(
-        "PosMock finge di essere un terminale POS. Apre un ServerSocket e risponde al middleware "
-        "come farebbe un terminale vero, cosi' da poter provare il percorso di pagamento senza "
-        "hardware — e soprattutto da poter riprodurre a comando i casi che sul banco non si "
-        "riescono a provocare."))
+        "PosMock finge di essere un terminale POS. Apre un ServerSocket e risponde a chi lo "
+        "interroga come farebbe un terminale vero, cosi' da poter provare il percorso di "
+        "pagamento senza hardware — e soprattutto da poter riprodurre a comando i casi che sul "
+        "banco non si riescono a provocare. Chi lo interroga sono due tratte diverse: la catena "
+        "col palmare, che passa dal middleware, e la cassa da sola, che al terminale ci parla "
+        "anche senza."))
     s += codice("""
 Giano (cassa) <-> Ermes (palmare) --WS--> UniquePosManager --TCP--> PosMock
+Giano (cassa) -----------------------------------------------TCP--> PosMock
                                                                     (invece del POS vero)
 """, 7.6)
     s.append(p(

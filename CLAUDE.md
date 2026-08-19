@@ -2,11 +2,20 @@
 
 App Android (Jetpack Compose) che **finge di essere un terminale POS**. Si mette in ascolto
 su una porta TCP e risponde a chi la interroga: nella pratica **UniquePosManager** (middleware
-C#/WPF, Italia) o **PosManagerKtorDe** (Ktor, Germania).
+C#/WPF, Italia), **PosManagerKtorDe** (Ktor, Germania) oppure **Giano** stesso, che al terminale
+ci parla anche da solo.
 
 ```
 Giano (cassa) ↔ Ermes (palmare) ──WS──► UniquePosManager ──TCP──► PosMock   ← invece del POS vero
+Giano (cassa) ─────────────────────────────────────────────TCP──► PosMock   ← tratta diretta
 ```
+
+**Sono due tratte, non due modi di guardare la stessa.** La catena col palmare passa dal
+middleware, che ha timeout suoi; la tratta diretta no — li' la cassa parla al terminale con la
+`CardTerminalLibrary` (ZVT) o con la DLL Ingenico (IAE37), e i tempi sono altri. Ognuna ha il
+suo piano di prova: `../UniquePosManager/doc/piano-test-1.0.3.md` e
+`../GianoITA/Docs/TEST-POS-TIMEOUT.md`. **Vanno provate tutte e due**: a parita' di guasto
+raccontano storie diverse.
 
 Serve a provare il percorso di pagamento senza terminale fisico, e soprattutto a **riprodurre
 a comando i casi che sul banco non si riescono a provocare**: il terminale che non risponde,
@@ -55,7 +64,9 @@ passi che contano sono:
   segue. Vedi le tabelle in `ZvtMessages` e `Iae37Messages`.
 - **Lo status IAE37 (`t`) e' il guardiano**: il middleware lo interroga con 5s di timeout prima
   di ogni pagamento e senza risposta valida dichiara `PosBusy` — la richiesta di pagamento non
-  parte nemmeno.
+  parte nemmeno. Quei 5s sono pero' **del middleware, non del protocollo**: Giano applica alla
+  DLL un unico timeout da 60s per lettura, status compreso, quindi lo stesso silenzio li' costa
+  fino a 180s. Vedi `doc/protocollo-iae37.md`.
 - **I tre silenzi sono cose diverse.** "Nessuna risposta" (prima dell'ACK) fa dichiarare POS
   occupato in 5 secondi; "ACK e poi silenzio" lascia tutti appesi sul pagamento ed e' il modo
   in cui nasce un incasso orfano; **"Muto dopo l'ACK di registrazione"** (opzione a parte, non
@@ -92,3 +103,20 @@ Le prove contro il middleware vero le fa l'utente.
    esiti). La modalita' `raw` registra e basta, e serve per i protocolli ancora da capire.
 4. Telefono e PC devono stare sulla stessa rete, e il middleware fa un **ping ICMP** prima di
    collegarsi: se la rete lo blocca, disattivare il ping per quel POS.
+
+## Collegarlo a Giano, senza middleware
+
+1. Avvia il servizio in PosMock: protocollo **ZVT** su **20007**, oppure **IAE37** su **5577**.
+2. In Giano, pagina admin → hardware registrato → terminale Ingenico: TCP/IP, IP del telefono,
+   la stessa porta, `InUse` acceso. Per IAE37 servono **tre** cose e non una:
+   `RegionalSettingsLanguage` = Italiano, riavvio, porta 5577. Il log deve dire
+   `protocol=IAE37 (Protocollo 17)` prima di cominciare.
+3. Il telefono deve **rispondere al ping ICMP**: Giano pinga ogni 5 s e — a differenza del
+   middleware — **non lo si puo' disattivare**. Se non risponde, il terminale risulta
+   `NotResponding` e il tasto POS resta spento.
+4. Il tender deve contenere `KARTE`, `CARTA` o `CREDIT CARD` nel nome e non essere marcato cash,
+   altrimenti `TenderVM.IsCardTender` non lo riconosce.
+
+⚠️ Su Giano **asporto e tavolo non sono la stessa prova**: l'asporto ha una finestra di 150 s
+sulla durata totale, sui tavoli non c'e' (`SendPaymentAndForget`). Un ritardo lungo va provato
+**sul tavolo**, altrimenti scatta la finestra e non si misura quello che si voleva misurare.

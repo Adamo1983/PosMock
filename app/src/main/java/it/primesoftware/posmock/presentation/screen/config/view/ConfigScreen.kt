@@ -182,7 +182,10 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
             supportingText = {
                 Text(
                     if (uiState.isDelayValid) {
-                        "Serve a provare i timeout: il middleware molla a 60s, il palmare a 90s"
+                        "Serve alla transazione lenta ma viva: sullo ZVT il keep-alive ogni " +
+                            "10 s copre l'attesa, quindi scattano solo i timeout sulla durata " +
+                            "(palmare 90 s, Giano 150 s in asporto). Su IAE37 non c'e' " +
+                            "keep-alive: il ritardo e' silenzio, e la DLL molla a 60 s."
                     } else {
                         "Valore non valido (0-600000): resta quello di prima"
                     }

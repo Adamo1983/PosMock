@@ -6,7 +6,9 @@
 ## Cos'e'
 
 Simulatore di terminale POS. Apre un `ServerSocket` sulla porta scelta e serve le connessioni
-del middleware (UniquePosManager / PosManagerKtorDe) come farebbe un terminale vero. Due
+di chi lo interroga come farebbe un terminale vero: il middleware (UniquePosManager /
+PosManagerKtorDe) **oppure Giano direttamente**, che al terminale ci parla anche senza
+middleware e ha un piano di prova suo (`../GianoITA/Docs/TEST-POS-TIMEOUT.md`). Due
 protocolli **entrambi simulati**, ZVT e IAE37 (vedi "I tre protocolli"); la modalita' `raw`
 registra soltanto, ed e' lo strumento con cui IAE37 e' stato ricostruito.
 
@@ -212,6 +214,35 @@ interessante.
 Il **ritardo** configurabile si applica solo all'autorizzazione, non alla registrazione: sulla
 registrazione il middleware molla dopo 5s, quindi un ritardo la' significherebbe soltanto
 "POS occupato" a ogni prova, nascondendo i test veri.
+
+⚠️ **Il ritardo non serve piu' a simulare un silenzio lungo.** Da quando c'e' il keep-alive
+(17/08/2026), sullo ZVT l'attesa e' coperta da un `04 FF` ogni 10 s: i timeout che misurano il
+**silenzio** ripartono a ogni pacchetto e non scattano mai. Con il ritardo si prova la
+transazione **lenta ma viva** — T8.2 del piano del middleware, A3b di quello di Giano — e
+scattano solo i timeout sulla **durata totale**. Per il silenzio c'e' il preset "ACK e poi
+silenzio".
+
+Chi molla e dopo quanto, letto nel codice e non nei commenti:
+
+| tratta | valore | misura | dove |
+|---|---|---|---|
+| Ermes → middleware | **90 s** | durata | `PosManagementViewModel.kt:951` (`PAYMENT_TIMEOUT_SECONDS`) |
+| middleware → POS, ZVT | **nessuno** | — | `ZvtBridge.cs:117` e' `Task.Delay(Timeout.Infinite)` |
+| middleware → POS, IAE37 | **60 s** | durata | `PosManagerServer.cs:830` (`BridgePaymentBusinessTimeoutMs`) |
+| libreria ZVT, slave mode | 180 s | **silenzio** | `NetworkTransport.cs:40` |
+| Giano → POS, finestra asporto | **150 s** | durata | `FinalizeOrderWindowVM.cs:74` |
+| Giano → POS, watchdog device | 200 s | **silenzio** | `IngenicoZvtA32deCreditCardTerminalDevice.cs:47` |
+| Giano → POS, tetto assoluto | **900 s** | durata | idem, `:51` |
+| prima dell'ACK (master mode) | 2 s | silenzio | `NetworkTransport.cs:28` |
+
+I 60 s **valgono solo per IAE37**: sullo ZVT il middleware non ha un tetto suo e l'unico limite
+e' quello della libreria. Su IAE37, all'opposto, il mock non manda keep-alive
+(`Iae37TerminalHandler`), quindi li' il ritardo e' silenzio per davvero.
+
+⚠️ **Giano parla al POS anche senza middleware**, e ha un piano di prova suo che usa questa app:
+`../GianoITA/Docs/TEST-POS-TIMEOUT.md`. I quattro valori qui sopra stanno pero' su
+`feature/prenotazioni` e `feature/datev`: su `main` la libreria ha ancora `Timeout.Infinite` in
+slave mode e i tetti del device non esistono.
 
 ## I tre protocolli
 

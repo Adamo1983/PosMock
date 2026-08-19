@@ -68,6 +68,19 @@ Conseguenza diretta, ed e' il motivo per cui questa app esiste:
   occupato — `UniquePosManager` fa `await initTask` dentro `ZvtBridge` — con la libreria
   vecchia non rispondeva **affatto**, nemmeno `PosBusy`.
 
+**Gli stessi tre silenzi, sulla tratta diretta Giano ↔ PosMock**, raccontano un'altra storia,
+perche' li' sopra la libreria non c'e' nessun middleware ma la cassa stessa:
+
+| silenzio | catena col palmare | Giano da solo |
+|---|---|---|
+| prima dell'ACK | `PosBusy` in ~5s (`InitTimeoutMs`) | errore in pochi secondi (master mode, 2s) |
+| dopo l'ACK del pagamento | middleware appeso fino ai 180s della libreria, palmare gia' andato a 90s | ~180s, poi `Empty response apdu data` e `Late answer from cct … the amount HAS been charged`; in asporto arriva prima la finestra dei 150s |
+| dopo l'ACK della registrazione | riga a log a 5s **ma nessuna risposta** finche' l'`initTask` non rientra | 180s **per ogni tentativo di connessione**, poi riprova da capo |
+
+I due piani di prova sono `../UniquePosManager/doc/piano-test-1.0.3.md` §8 (T8.1/T8.2/T8.3) e
+`../GianoITA/Docs/TEST-POS-TIMEOUT.md` (A1/A2/A4/A5/A7). Non sono doppioni: e' la stessa
+libreria vista da due chiamanti che sbagliano in modo diverso.
+
 > **Aggiornamento 16-17/08/2026.** In slave mode la libreria non aspetta piu' per sempre:
 > `SLAVE_MODE_RESPONSE_TIMEOUT` vale **180 s** (sia su `NetworkTransport` sia, dal 17/08, su
 > `RS232Transport`), e la DLL aggiornata e' anche in `UniquePosManager/Libs/`. Il difetto
