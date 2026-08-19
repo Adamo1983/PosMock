@@ -36,6 +36,9 @@ passi che contano sono:
 - [doc/protocollo-iae37.md](doc/protocollo-iae37.md) — il protocollo italiano ricostruito dai
   trace della DLL: framing, LRC, comandi, cosa e' certo e cosa e' dedotto. **Leggerlo prima di
   toccare `data/server/protocol/iae37/`.**
+- [doc/Service-Android-in-PosMock.pdf](doc/Service-Android-in-PosMock.pdf) — perche' c'e' un
+  foreground service, perche' il server non vive dentro di lui e cosa succede allo stop. E'
+  **generato**: si modifica `doc/genera-pdf-service.py` e si rigenera, mai il PDF a mano.
 
 ## Convenzioni
 

@@ -167,6 +167,12 @@ quello del service dall'azione della notifica. Tre dettagli che non sono opziona
   l'`Address already in use` del riavvio successivo ha una riga che lo spiega.
 - **`stopService()` e' l'ultima istruzione**, dopo lo stato e il log. Fermare il service fa
   partire il suo `onDestroy`, che cancella lo scope in cui quella stessa pulizia sta girando.
+- **La notifica se la toglie il service da solo**, sullo stato `Stopped`, invece di aggiornarne
+  il testo: sul filo del rasoio, ActivityManager cancella la notifica del foreground service
+  appena riceve lo `stopService()` e consegna l'`onDestroy` **dopo**. In quella finestra un
+  aggiornamento della notifica la fa rinascere orfana — icona accesa a banco spento e, con
+  `setOngoing(true)`, nemmeno scartabile con lo swipe. La stessa pulizia sta anche in
+  `onDestroy`, per l'ordine inverso.
 
 ## Quando il server muore da solo
 

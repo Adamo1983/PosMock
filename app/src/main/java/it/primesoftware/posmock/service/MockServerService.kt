@@ -73,6 +73,9 @@ class MockServerService : Service() {
 
     override fun onDestroy() {
         scope.cancel()
+        // Rete di sicurezza per l'ordine opposto: se e' l'onDestroy ad arrivare
+        // per primo, il collector viene cancellato e il ramo Stopped non gira mai.
+        clearNotification()
         super.onDestroy()
     }
 
@@ -86,7 +89,10 @@ class MockServerService : Service() {
                         )
 
                     ServerState.Starting -> updateNotification("Avvio in corso…")
-                    ServerState.Stopped -> updateNotification("Server fermo")
+                    // Niente notifica di "fermo": il service esiste solo finche' c'e'
+                    // un server da tenere vivo, e una notifica ripubblicata qui
+                    // sopravvive al service — vedi removeNotificationAndStop().
+                    ServerState.Stopped -> removeNotificationAndStop()
                     is ServerState.Error -> reportErrorAndStop(state.message)
                 }
             }
@@ -95,6 +101,29 @@ class MockServerService : Service() {
 
     private fun updateNotification(text: String) {
         notificationManager().notify(NOTIFICATION_ID, buildNotification(text))
+    }
+
+    /**
+     * Server fermo: il service non ha piu' niente da tenere vivo e si toglie di
+     * mezzo, notifica compresa.
+     *
+     * Toglierla **qui** e non lasciar fare al sistema e' la differenza fra una
+     * tendina pulita e un'icona che resta accesa a banco spento. `stop()` porta
+     * lo stato a Stopped e subito dopo chiama `stopService()`: ActivityManager
+     * cancella la notifica del foreground service e solo **dopo** consegna
+     * l'onDestroy: se in quella finestra il collector ripubblicasse la notifica,
+     * questa resterebbe in tendina senza piu' un service dietro — e con
+     * `setOngoing(true)` non la si scarta nemmeno con lo swipe.
+     */
+    private fun removeNotificationAndStop() {
+        clearNotification()
+        stopSelf()
+    }
+
+    /** Solo la notifica del service: quella d'errore ha un altro id e deve restare. */
+    private fun clearNotification() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        notificationManager().cancel(NOTIFICATION_ID)
     }
 
     /**
