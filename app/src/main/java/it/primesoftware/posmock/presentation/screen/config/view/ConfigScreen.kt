@@ -182,10 +182,9 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
             supportingText = {
                 Text(
                     if (uiState.isDelayValid) {
-                        "Serve alla transazione lenta ma viva: sullo ZVT il keep-alive ogni " +
-                            "10 s copre l'attesa, quindi scattano solo i timeout sulla durata " +
-                            "(palmare 90 s, Giano 150 s in asporto). Su IAE37 non c'e' " +
-                            "keep-alive: il ritardo e' silenzio, e la DLL molla a 60 s."
+                        "Serve alla transazione lenta ma viva:" +
+                            "Ermes 180 sec. hardcoded, Giano 180 sec. default quando si registra il dispositivo.\n" +
+                            "UniquePosManager -> default 180 sec."
                     } else {
                         "Valore non valido (0-600000): resta quello di prima"
                     }
