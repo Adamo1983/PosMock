@@ -166,10 +166,12 @@ testo in `protocolSpecificErrorDescription`.
 **Certo** (verificato su frame reali, coperto dai test): framing, LRC, comandi, testa comune,
 tracciato dello status, posizione di `TransactionResult` e `KODescription`.
 
-**Dedotto da un solo campione**: la posizione dell'importo nella richiesta `P` — campo `Amount`
-di 8 cifre all'offset 23 del payload (unica cattura, 0,05 €). Se un giorno il log mostrasse un
-importo diverso da quello chiesto dalla cassa, e' `Iae37Messages.AMOUNT_OFFSET` da correggere,
-e non serve toccare altro.
+**Confermato il 21/08/2026** (era "dedotto da un solo campione"): la posizione dell'importo nella
+richiesta `P` — campo `Amount` di 8 cifre all'offset 23 del payload. L'unica cattura era a 0,05 €;
+la prova contro UniquePosManager 1.0.3 ha aggiunto due importi diversi, `00000100` letto come
+1,00 € e `00000200` come 2,00 €, quindi `Iae37Messages.AMOUNT_OFFSET = 23` e' giusto. Se un giorno
+il log mostrasse comunque un importo diverso da quello chiesto dalla cassa, resta quella la
+costante da correggere e non serve toccare altro.
 
 **Non parametrizzato**: la coda del frame di esito positivo (PAN, codice autorizzazione, STAN,
 importi) e' quella di una cattura reale. Ci sono piu' campi numerici e senza due catture con

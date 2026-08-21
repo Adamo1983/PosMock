@@ -23,19 +23,42 @@ quello che risponde dopo un minuto, quello che chiude la connessione a meta' tra
 gli scenari da cui nasce il pagamento orfano (`../UniquePosManager/doc/pagamenti-orfani.md`,
 `../Ermes/doc/analisi-pagamento-pos-orfano.md`).
 
-## Stato al 14/08/2026
+## Stato al 21/08/2026
 
-**ZVT è validato contro il middleware vero. IAE37 no**: il codice c'è tutto (status `t`,
-pagamento `P`, esito `E`, i cinque esiti mock) ma non è mai stato messo davanti a
-UniquePosManager. Il collaudo è il §1 di `../UniquePosManager/doc/piano-test-1.0.3.md`, e i due
-passi che contano sono:
+**Validati contro il middleware vero tutti e due i protocolli**: ZVT dal 14/08, **IAE37 dal
+21/08**, in una sessione con Ermes 2.2.2-debug + UniquePosManager 1.0.3 e il POS `adamo_mock`
+(192.168.1.104:5577). I due passi che erano rimasti aperti sono chiusi:
 
-1. **lo status `t`** — il middleware lo interroga con 5s di timeout prima di *ogni* pagamento e
-   senza risposta valida dichiara `PosBusy`: finché non passa quello, di IAE37 non si prova
-   nient'altro;
-2. **la calibrazione dell'importo** — `Iae37Messages.AMOUNT_OFFSET = 23` è dedotto da **una sola
-   cattura** (0,05 €). Due pagamenti di importo diverso lo confermano o danno subito il valore
-   giusto; è l'unica costante da correggere.
+1. **lo status `t`/`s`** — il middleware lo interroga prima di *ogni* pagamento e senza risposta
+   valida dichiara `PosBusy`: risposto correttamente, con l'ACK a 4 ms e il frame di stato subito
+   dopo. Finché non passa quello, di IAE37 non si prova nient'altro;
+2. **la calibrazione dell'importo** — `Iae37Messages.AMOUNT_OFFSET = 23`, che era dedotto da
+   **una sola cattura** (0,05 €), è confermato: `--amount "00000100"` letto come 1,00 € e
+   `"00000200"` come 2,00 €. Due importi diversi, nessuna correzione da fare.
+
+Provati dal vivo anche `Approvato`, `Rifiutato (credito insufficiente)`, `Nessuna risposta`,
+`ACK e poi silenzio` e `Chiude la connessione`, ciascuno riconosciuto correttamente lungo tutta
+la catena fino al palmare. Lo scenario "ACK e poi silenzio" ha fatto emergere un difetto vero
+lato Ermes (l'avviso di esito incerto che si perdeva al tentativo successivo), corretto lo stesso
+giorno: cronaca in `../ermes-jetpack-compose/doc/analisi-pagamento-pos-orfano.md`, quinto giro.
+
+### ⚠️ Due trappole del banco, imparate quel giorno
+
+- **Lo status legge `defaultOutcome`, non la scelta del dialog.** Con "Chiedi ogni volta" attivo,
+  quello che tocchi nel dialog governa **solo il pagamento**: `handleStatus` guarda l'esito
+  *predefinito* nelle impostazioni. Il 21/08 il predefinito era rimasto su "Chiude la
+  connessione" mentre dal dialog si sceglieva "ACK e poi silenzio" — risultato: il pre-flight
+  moriva prima che il dialog comparisse, e per un quarto d'ora tutto rispondeva "POS occupato"
+  senza che nel log del mock comparisse una sola riga `Richiesta pagamento`.
+- **Con `Nessuna risposta` o `Chiude la connessione` come predefinito non si prova più niente**:
+  il middleware non supera mai il pre-flight, quindi *qualunque* scenario si volesse provare
+  diventa "POS occupato". Per `NoAck` è voluto e realistico (un POS occupato dal cassiere davvero
+  non risponde allo stato); per `DropConnection` è un effetto collaterale che blocca il banco in
+  silenzio. **Da valutare**: rendere lo status indipendente dall'esito di pagamento, o almeno
+  avvisare in UI che con quei due predefiniti nessun pagamento partirà.
+
+Le due firme si distinguono a occhio dai tempi, ed è utile saperlo per non confondersi:
+connessione chiusa → `returnCode=5` in ~120 ms; silenzio → `returnCode=1` dopo ~3 s.
 
 ## Da leggere a inizio sessione
 
