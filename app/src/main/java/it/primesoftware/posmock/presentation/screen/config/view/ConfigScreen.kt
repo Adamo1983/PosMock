@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.primesoftware.posmock.domain.model.MockOutcome
 import it.primesoftware.posmock.domain.model.MockProtocol
-import it.primesoftware.posmock.domain.model.RawReplyMode
+//import it.primesoftware.posmock.domain.model.RawReplyMode
 import it.primesoftware.posmock.presentation.components.OptionRow
 import it.primesoftware.posmock.presentation.components.SectionCard
 import it.primesoftware.posmock.presentation.screen.config.viewModel.ConfigAction
@@ -69,9 +69,9 @@ fun ConfigScreen(
         }
         item { ProtocolCard(uiState, onAction) }
         item { OutcomeCard(uiState, onAction) }
-        if (uiState.config.protocol == MockProtocol.RAW) {
-            item { RawModeCard(uiState, onAction) }
-        }
+//        if (uiState.config.protocol == MockProtocol.RAW) {
+//            item { RawModeCard(uiState, onAction) }
+//        }
     }
 }
 
@@ -231,35 +231,35 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
     }
 }
 
-@Composable
-private fun RawModeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit) {
-    SectionCard(title = "Risposta in modalita' raw") {
-        Text(
-            text = "Nessuna logica di protocollo: i byte si registrano e basta. " +
-                "Il log della schermata Traffico mostra esadecimale e ASCII.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        RawReplyMode.entries.forEach { mode ->
-            OptionRow(
-                selected = uiState.config.rawReplyMode == mode,
-                onClick = { onAction(ConfigAction.RawModeSelected(mode)) },
-                title = mode.label,
-                subtitle = mode.description,
-            )
-        }
-        if (uiState.config.rawReplyMode == RawReplyMode.FIXED_HEX) {
-            OutlinedTextField(
-                value = uiState.config.rawReplyHex,
-                onValueChange = { onAction(ConfigAction.RawHexChanged(it)) },
-                label = { Text("Risposta (esadecimale)") },
-                placeholder = { Text("02 30 30 03") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
+//@Composable
+//private fun RawModeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit) {
+//    SectionCard(title = "Risposta in modalita' raw") {
+//        Text(
+//            text = "Nessuna logica di protocollo: i byte si registrano e basta. " +
+//                "Il log della schermata Traffico mostra esadecimale e ASCII.",
+//            style = MaterialTheme.typography.bodySmall,
+//            color = MaterialTheme.colorScheme.onSurfaceVariant,
+//        )
+//        RawReplyMode.entries.forEach { mode ->
+//            OptionRow(
+//                selected = uiState.config.rawReplyMode == mode,
+//                onClick = { onAction(ConfigAction.RawModeSelected(mode)) },
+//                title = mode.label,
+//                subtitle = mode.description,
+//            )
+//        }
+//        if (uiState.config.rawReplyMode == RawReplyMode.FIXED_HEX) {
+//            OutlinedTextField(
+//                value = uiState.config.rawReplyHex,
+//                onValueChange = { onAction(ConfigAction.RawHexChanged(it)) },
+//                label = { Text("Risposta (esadecimale)") },
+//                placeholder = { Text("02 30 30 03") },
+//                singleLine = true,
+//                modifier = Modifier.fillMaxWidth(),
+//            )
+//        }
+//    }
+//}
 
 @Preview(showBackground = true, heightDp = 900)
 @Composable

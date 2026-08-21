@@ -1,5 +1,6 @@
 package it.primesoftware.posmock.data.server
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
@@ -7,7 +8,7 @@ import android.os.Build
 import android.os.PowerManager
 import it.primesoftware.posmock.data.server.protocol.ProtocolHandler
 import it.primesoftware.posmock.data.server.protocol.iae37.Iae37TerminalHandler
-import it.primesoftware.posmock.data.server.protocol.raw.RawProtocolHandler
+//import it.primesoftware.posmock.data.server.protocol.raw.RawProtocolHandler
 import it.primesoftware.posmock.data.server.protocol.zvt.ZvtTerminalHandler
 import it.primesoftware.posmock.domain.model.LogDirection
 import it.primesoftware.posmock.domain.model.MockProtocol
@@ -35,6 +36,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.Collections
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Il server TCP che fa da terminale.
@@ -150,7 +152,7 @@ class MockServerController(
         // handler non esca comunque: meglio una porta ancora occupata al prossimo
         // avvio, purche' scritto nel log — cosi' l'"Address already in use" che
         // seguirebbe ha una riga che lo spiega.
-        if (withTimeoutOrNull(STOP_JOIN_TIMEOUT_MS) { job.cancelAndJoin() } == null) {
+        if (withTimeoutOrNull(STOP_JOIN_TIMEOUT_MS.milliseconds) { job.cancelAndJoin() } == null) {
             log.log(
                 LogDirection.ERROR,
                 "Arresto non completato entro $STOP_JOIN_TIMEOUT_MS ms: " +
@@ -192,8 +194,8 @@ class MockServerController(
         MockProtocol.IAE37 ->
             Iae37TerminalHandler(log, outcomeProvider, networkInfoProvider) { configStore.config.value }
 
-        MockProtocol.RAW ->
-            RawProtocolHandler(log, outcomeProvider) { configStore.config.value }
+//        MockProtocol.RAW ->
+//            RawProtocolHandler(log, outcomeProvider) { configStore.config.value }
     }
 
     private fun closeAllSockets() {
@@ -203,6 +205,7 @@ class MockServerController(
         }
     }
 
+    @SuppressLint("WakelockTimeout")
     @Suppress("DEPRECATION")
     private fun acquireLocks() {
         // Un lock preso due volte perde il riferimento al primo, che resta in mano

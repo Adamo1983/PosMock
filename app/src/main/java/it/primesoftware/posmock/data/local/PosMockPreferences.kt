@@ -8,6 +8,7 @@ import it.primesoftware.posmock.domain.model.RawReplyMode
 import it.primesoftware.posmock.domain.model.ServerConfig
 import it.primesoftware.posmock.domain.model.DeclineReason
 import it.primesoftware.posmock.domain.repository.IPreferencesRepository
+import androidx.core.content.edit
 
 /**
  * Configurazione su SharedPreferences.
@@ -28,7 +29,11 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
         // ritrova salvato, e senza questa riga tornerebbe al default senza
         // capire perche'.
         val savedProtocol = prefs.getString(KEY_PROTOCOL, null)
-            ?.let { if (it == LEGACY_IAE37_RAW) MockProtocol.RAW.name else it }
+            ?.let {
+//                if (it == LEGACY_IAE37_RAW) MockProtocol.RAW.name
+//                else
+                    it
+            }
         val protocol = savedProtocol
             ?.let { name -> MockProtocol.entries.firstOrNull { it.name == name } }
             ?: default.protocol
@@ -49,17 +54,20 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
     }
 
     override fun save(config: ServerConfig) {
-        prefs.edit()
-            .putString(KEY_PROTOCOL, config.protocol.name)
-            .putInt(KEY_PORT, config.port)
-            .putString(KEY_OUTCOME, outcomeKey(config.defaultOutcome))
-            .putInt(KEY_OUTCOME_ERROR, (config.defaultOutcome as? MockOutcome.Decline)?.error?.zvtCode ?: -1)
-            .putLong(KEY_DELAY, config.responseDelayMs)
-            .putBoolean(KEY_ASK_EACH_TIME, config.askEachTime)
-            .putBoolean(KEY_HANG_AFTER_REG_ACK, config.hangAfterRegistrationAck)
-            .putString(KEY_RAW_MODE, config.rawReplyMode.name)
-            .putString(KEY_RAW_HEX, config.rawReplyHex)
-            .apply()
+        prefs.edit {
+            putString(KEY_PROTOCOL, config.protocol.name)
+                .putInt(KEY_PORT, config.port)
+                .putString(KEY_OUTCOME, outcomeKey(config.defaultOutcome))
+                .putInt(
+                    KEY_OUTCOME_ERROR,
+                    (config.defaultOutcome as? MockOutcome.Decline)?.error?.zvtCode ?: -1
+                )
+                .putLong(KEY_DELAY, config.responseDelayMs)
+                .putBoolean(KEY_ASK_EACH_TIME, config.askEachTime)
+                .putBoolean(KEY_HANG_AFTER_REG_ACK, config.hangAfterRegistrationAck)
+                .putString(KEY_RAW_MODE, config.rawReplyMode.name)
+                .putString(KEY_RAW_HEX, config.rawReplyHex)
+        }
     }
 
     private fun loadOutcome(fallback: MockOutcome): MockOutcome =
@@ -98,7 +106,7 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
         const val KEY_RAW_HEX = "raw_reply_hex"
 
         /** Nome storico della modalita' raw, quando IAE37 non era simulato. */
-        const val LEGACY_IAE37_RAW = "IAE37_RAW"
+        //const val LEGACY_IAE37_RAW = "IAE37_RAW"
 
         const val OUTCOME_APPROVE = "approve"
         const val OUTCOME_DECLINE = "decline"

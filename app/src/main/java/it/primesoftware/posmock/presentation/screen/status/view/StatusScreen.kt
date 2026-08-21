@@ -154,9 +154,9 @@ private fun SummaryCard(uiState: StatusUiState) {
         if (!config.askEachTime) {
             InfoRow("Ritardo", "${config.responseDelayMs} ms")
         }
-        if (config.protocol == MockProtocol.RAW) {
-            InfoRow("Risposta raw", config.rawReplyMode.label)
-        }
+//        if (config.protocol == MockProtocol.RAW) {
+//            InfoRow("Risposta raw", config.rawReplyMode.label)
+//        }
         // Si mostra solo quando e' acceso, e proprio per quello: e' l'unica opzione che
         // impedisce ai pagamenti di partire, e da qui si capisce subito perche'.
         if (config.hangAfterRegistrationAck && config.protocol == MockProtocol.ZVT) {
