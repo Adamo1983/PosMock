@@ -151,9 +151,13 @@ private fun SummaryCard(uiState: StatusUiState) {
             label = "Esito",
             value = if (config.askEachTime) "Lo scegli tu" else config.defaultOutcome.label,
         )
-        if (!config.askEachTime) {
-            InfoRow("Ritardo", "${config.responseDelayMs} ms")
-        }
+        // Vale in entrambe le modalita': col preset prima della risposta, in
+        // manuale dopo la scelta. L'etichetta lo dice, perche' letta da qui e'
+        // l'unica cosa che spiega perche' l'esito non parte subito.
+        InfoRow(
+            label = if (config.askEachTime) "Ritardo dopo la scelta" else "Ritardo",
+            value = "${config.responseDelayMs} ms",
+        )
 //        if (config.protocol == MockProtocol.RAW) {
 //            InfoRow("Risposta raw", config.rawReplyMode.label)
 //        }

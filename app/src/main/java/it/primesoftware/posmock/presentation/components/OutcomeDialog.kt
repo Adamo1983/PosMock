@@ -46,6 +46,18 @@ fun OutcomeDialog(
                     text = "${decision.request.kind} da ${decision.request.peer}",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                // Il ritardo scatta dopo la scelta: detto qui, perche' altrimenti
+                // si tocca un esito e per qualche secondo non succede niente —
+                // che e' il sintomo che questa app serve a indagare, non a
+                // produrre per sbaglio sul banco.
+                if (decision.responseDelayMs > 0) {
+                    Text(
+                        text = "Dopo la scelta il mock aspetta " +
+                            "${decision.responseDelayMs} ms prima di rispondere.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),

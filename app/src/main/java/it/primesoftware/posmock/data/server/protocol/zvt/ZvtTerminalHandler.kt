@@ -1,6 +1,13 @@
+// Niente in questo file blocca davvero: i getter degli stream e le close() non
+// fanno I/O, e le letture e scritture che bloccano sono gia' dentro
+// withContext(Dispatchers.IO). Perche' l'ispezione le marchi lo stesso, e cosa
+// resta a carico di chi scrive, sta nel KDoc di ProtocolHandler.
+@file:Suppress("BlockingMethodInNonBlockingContext")
+
 package it.primesoftware.posmock.data.server.protocol.zvt
 
 import it.primesoftware.posmock.data.server.protocol.ProtocolHandler
+import it.primesoftware.posmock.data.server.protocol.awaitResponseDelay
 import it.primesoftware.posmock.domain.model.LogDirection
 import it.primesoftware.posmock.domain.model.MockOutcome
 import it.primesoftware.posmock.domain.model.MockProtocol
@@ -22,6 +29,7 @@ import java.io.OutputStream
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Il terminale ZVT simulato: legge i comandi della cassa e risponde come
@@ -183,14 +191,11 @@ class ZvtTerminalHandler(
         // vivo e sta lavorando, quindi vanno coperte dal keep-alive: senza, un'attesa
         // lunga e' silenzio puro e la cassa la tratta come un terminale muto.
         val outcome = withKeepAlive(socket, input, output) {
-            if (config.responseDelayMs > 0 && !config.askEachTime) {
-                log.log(LogDirection.INFO, "Attendo ${config.responseDelayMs} ms prima di rispondere")
-                delay(config.responseDelayMs)
-            }
-
-            outcomeProvider.decide(request)
+            val chosen = outcomeProvider.decide(request)
+            log.log(LogDirection.INFO, "Esito scelto: ${chosen.label}")
+            awaitResponseDelay(config, log)
+            chosen
         }
-        log.log(LogDirection.INFO, "Esito scelto: ${outcome.label}")
 
         when (outcome) {
             MockOutcome.Approve -> {
@@ -277,7 +282,7 @@ class ZvtTerminalHandler(
     ): T = coroutineScope {
         val keepAlive = launch {
             while (true) {
-                delay(KEEP_ALIVE_INTERVAL_MS)
+                delay(KEEP_ALIVE_INTERVAL_MS.milliseconds)
                 send(output, ZvtMessages.intermediateStatus(), "Intermediate status (keep-alive)")
                 awaitAck(socket, input)
             }

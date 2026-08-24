@@ -1,3 +1,8 @@
+// Le close() qui dentro stanno in funzioni suspend e l'ispezione le marca come
+// bloccanti: chiudono il descrittore e tornano, aspetterebbero solo con SO_LINGER
+// che non impostiamo. Vedi il KDoc di ProtocolHandler.
+@file:Suppress("BlockingMethodInNonBlockingContext")
+
 package it.primesoftware.posmock.data.server
 
 import android.annotation.SuppressLint

@@ -1,6 +1,13 @@
+// Niente in questo file blocca davvero: i getter degli stream e le close() non
+// fanno I/O, e le letture e scritture che bloccano sono gia' dentro
+// withContext(Dispatchers.IO). Perche' l'ispezione le marchi lo stesso, e cosa
+// resta a carico di chi scrive, sta nel KDoc di ProtocolHandler.
+@file:Suppress("BlockingMethodInNonBlockingContext")
+
 package it.primesoftware.posmock.data.server.protocol.iae37
 
 import it.primesoftware.posmock.data.server.protocol.ProtocolHandler
+import it.primesoftware.posmock.data.server.protocol.awaitResponseDelay
 import it.primesoftware.posmock.domain.model.LogDirection
 import it.primesoftware.posmock.domain.model.MockOutcome
 import it.primesoftware.posmock.domain.model.MockProtocol
@@ -11,7 +18,6 @@ import it.primesoftware.posmock.domain.repository.INetworkInfoProvider
 import it.primesoftware.posmock.domain.repository.IOutcomeProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.InputStream
 import java.io.OutputStream
@@ -183,13 +189,12 @@ class Iae37TerminalHandler(
 
         send(output, Iae37Codec.ack(), "ACK")
 
-        if (config.responseDelayMs > 0 && !config.askEachTime) {
-            log.log(LogDirection.INFO, "Attendo ${config.responseDelayMs} ms prima di rispondere")
-            delay(config.responseDelayMs)
-        }
-
         val outcome = outcomeProvider.decide(request)
         log.log(LogDirection.INFO, "Esito scelto: ${outcome.label}")
+
+        // Qui il ritardo e' silenzio per davvero: su IAE37 il mock non manda
+        // keep-alive, quindi chi misura il silenzio lo vede tutto.
+        awaitResponseDelay(config, log)
 
         when (outcome) {
             MockOutcome.Approve -> {

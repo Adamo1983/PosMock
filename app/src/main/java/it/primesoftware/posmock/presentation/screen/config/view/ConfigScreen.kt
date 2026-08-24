@@ -9,24 +9,43 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import it.primesoftware.posmock.domain.model.MockOutcome
 import it.primesoftware.posmock.domain.model.MockProtocol
+import it.primesoftware.posmock.domain.model.TerminalBrand
 //import it.primesoftware.posmock.domain.model.RawReplyMode
 import it.primesoftware.posmock.presentation.components.OptionRow
 import it.primesoftware.posmock.presentation.components.SectionCard
@@ -112,6 +131,29 @@ private fun ProtocolCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Uni
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
+        PortField(uiState, onAction)
+    }
+}
+
+/**
+ * Campo della porta: si scrive a mano **oppure** si sceglie dalla tendina.
+ *
+ * Le due strade sono lo stesso gesto in due momenti diversi del banco — la prima
+ * volta una porta si batte, dalla seconda in poi si ripesca — quindi un solo
+ * campo, editabile, con l'elenco appeso alla freccia. Una tendina e basta non
+ * basterebbe: la porta della prossima prova puo' essere una qualsiasi.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PortField(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         OutlinedTextField(
             value = uiState.portText,
             onValueChange = { onAction(ConfigAction.PortChanged(it)) },
@@ -119,7 +161,8 @@ private fun ProtocolCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Uni
             supportingText = {
                 Text(
                     if (uiState.isPortValid) {
-                        "Ingenico usa la 5577, CCV la 20007"
+                        "Ingenico usa la 5577, CCV la 20007. La freccia apre le porte " +
+                            "gia' usate; una porta nuova ci entra da sola."
                     } else {
                         "Porta non valida (1-65535): resta quella di prima"
                     }
@@ -127,9 +170,87 @@ private fun ProtocolCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Uni
             },
             isError = !uiState.isPortValid,
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done,
+            ),
+            // "Fine" chiude la tastiera e toglie il fuoco: il salvataggio in
+            // tendina passa da li', senza doverlo scrivere due volte.
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(
+                    expanded = expanded,
+                    // Ancora secondaria: sul campo editabile il tocco serve a
+                    // scrivere, quindi la tendina la apre solo la freccia.
+                    modifier = Modifier.menuAnchor(
+                        ExposedDropdownMenuAnchorType.SecondaryEditable
+                    ),
+                )
+            },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                .fillMaxWidth()
+                // Il fuoco che se ne va e' il momento in cui la porta battuta a
+                // mano si considera scelta. Non prima: la config si aggiorna a
+                // ogni cifra, e memorizzare li' riempirebbe la tendina di 5, 55
+                // e 557 sulla strada per 5577.
+                .onFocusChanged { if (!it.isFocused) onAction(ConfigAction.PortCommitted) },
         )
+
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            uiState.knownPorts.forEach { port ->
+                val brand = TerminalBrand.entries.firstOrNull { it.defaultPort == port }
+                val trailing: (@Composable () -> Unit)? = when {
+                    // Le porte di serie restano riconoscibili e non si possono
+                    // togliere: sono quelle di posList.cfg e della pagina
+                    // hardware di Giano. L'etichetta e' la **marca**, non il
+                    // protocollo: un Ingenico sta sulla 5577 anche parlando ZVT.
+                    brand != null -> {
+                        {
+                            Text(
+                                text = brand.label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    // Nemmeno la porta in uso: il campo la rimetterebbe in
+                    // elenco al primo cambio di fuoco, e una X che non toglie
+                    // niente sembra un difetto. Prima se ne sceglie un'altra.
+                    port == uiState.config.port -> null
+
+                    else -> {
+                        {
+                            IconButton(onClick = { onAction(ConfigAction.PortForgotten(port)) }) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = "Togli la porta $port dall'elenco",
+                                )
+                            }
+                        }
+                    }
+                }
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = port.toString(),
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = if (port == uiState.config.port) {
+                                FontWeight.Bold
+                            } else {
+                                FontWeight.Normal
+                            },
+                        )
+                    },
+                    onClick = {
+                        onAction(ConfigAction.PortPicked(port))
+                        expanded = false
+                    },
+                    trailingIcon = trailing,
+                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
+                )
+            }
+        }
     }
 }
 
@@ -180,9 +301,18 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
             onValueChange = { onAction(ConfigAction.DelayChanged(it)) },
             label = { Text("Ritardo prima di rispondere (ms)") },
             supportingText = {
+                // In manuale il ritardo vale lo stesso, ma dopo la scelta: senza
+                // dirlo, si tocca il dialog e sembra che non sia successo niente.
+                val quando = if (uiState.config.askEachTime) {
+                    "In manuale parte dopo la scelta: prima compare il dialog, poi il mock " +
+                        "aspetta e risponde. "
+                } else {
+                    ""
+                }
                 Text(
                     if (uiState.isDelayValid) {
-                        "Serve alla transazione lenta ma viva. Chi aspetta quanto: " +
+                        quando +
+                            "Serve alla transazione lenta ma viva. Chi aspetta quanto: " +
                             "UniquePosManager l'attesa configurata sul POS (default 180 s), " +
                             "Ermes la promessa del middleware (GET /pos?v=2) + 15 s, " +
                             "Giano 180 s default alla registrazione del dispositivo."
@@ -192,7 +322,6 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
                 )
             },
             isError = !uiState.isDelayValid,
-            enabled = !uiState.config.askEachTime,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),

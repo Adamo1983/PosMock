@@ -70,6 +70,23 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
         }
     }
 
+    /**
+     * Elenco separato da virgole e non `putStringSet`: l'insieme non ha ordine
+     * — e chi lo rilegge si ritroverebbe la tendina rimescolata a ogni avvio —
+     * e la stringa resta leggibile a occhio nel file delle preferenze quando si
+     * indaga un banco che si comporta male.
+     */
+    override fun loadKnownPorts(): List<Int> =
+        prefs.getString(KEY_KNOWN_PORTS, null)
+            ?.split(',')
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.filter { it in 1..65535 }
+            ?: emptyList()
+
+    override fun saveKnownPorts(ports: List<Int>) {
+        prefs.edit { putString(KEY_KNOWN_PORTS, ports.joinToString(",")) }
+    }
+
     private fun loadOutcome(fallback: MockOutcome): MockOutcome =
         when (prefs.getString(KEY_OUTCOME, null)) {
             OUTCOME_APPROVE -> MockOutcome.Approve
@@ -97,6 +114,7 @@ class PosMockPreferences(context: Context) : IPreferencesRepository {
         const val PREFS_NAME = "PosMock_preferences"
         const val KEY_PROTOCOL = "protocol"
         const val KEY_PORT = "port"
+        const val KEY_KNOWN_PORTS = "known_ports"
         const val KEY_OUTCOME = "default_outcome"
         const val KEY_OUTCOME_ERROR = "default_outcome_error"
         const val KEY_DELAY = "response_delay_ms"

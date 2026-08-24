@@ -6,6 +6,7 @@ import it.primesoftware.posmock.domain.model.MockOutcome
 import it.primesoftware.posmock.domain.model.MockProtocol
 import it.primesoftware.posmock.domain.model.RawReplyMode
 import it.primesoftware.posmock.domain.model.ServerConfig
+import it.primesoftware.posmock.domain.model.TerminalBrand
 import it.primesoftware.posmock.domain.repository.IConfigStore
 import it.primesoftware.posmock.domain.repository.IServerController
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,22 +16,41 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Porta valida secondo TCP: la stessa soglia in validazione e in memorizzazione. */
+private val PORT_RANGE = 1..65535
+private val DELAY_RANGE = 0L..600_000L
+
 data class ConfigUiState(
     val config: ServerConfig = ServerConfig.DEFAULT,
     val portText: String = ServerConfig.DEFAULT.port.toString(),
     val delayText: String = ServerConfig.DEFAULT.responseDelayMs.toString(),
+    /** Le porte proposte nella tendina, in ordine crescente. */
+    val knownPorts: List<Int> = TerminalBrand.entries.map { it.defaultPort }.sorted(),
     val isServerRunning: Boolean = false,
 ) {
     val isPortValid: Boolean
-        get() = portText.toIntOrNull()?.let { it in 1..65535 } == true
+        get() = portText.toIntOrNull()?.let { it in PORT_RANGE } == true
 
     val isDelayValid: Boolean
-        get() = delayText.toLongOrNull()?.let { it in 0..600_000 } == true
+        get() = delayText.toLongOrNull()?.let { it in DELAY_RANGE } == true
 }
 
 sealed interface ConfigAction {
     data class ProtocolSelected(val protocol: MockProtocol) : ConfigAction
     data class PortChanged(val text: String) : ConfigAction
+
+    /** Porta scelta dalla tendina invece che battuta. */
+    data class PortPicked(val port: Int) : ConfigAction
+
+    /**
+     * La porta scritta a mano si considera finita: il campo ha perso il fuoco
+     * oppure e' arrivato "Fine" dalla tastiera. Da qui entra nella tendina.
+     */
+    data object PortCommitted : ConfigAction
+
+    /** Porta tolta dalla tendina con la X. */
+    data class PortForgotten(val port: Int) : ConfigAction
+
     data class OutcomeSelected(val outcome: MockOutcome) : ConfigAction
     data class DelayChanged(val text: String) : ConfigAction
     data class AskEachTimeChanged(val enabled: Boolean) : ConfigAction
@@ -46,6 +66,11 @@ sealed interface ConfigAction {
  * Un valore non valido resta **solo** nel campo di testo e non viene persistito:
  * cosi' una porta digitata a meta' non puo' arrivare al server, e il riepilogo
  * mostra sempre qualcosa con cui si puo' davvero partire.
+ *
+ * La porta ha due momenti distinti, e vanno tenuti separati: **cambia** a ogni
+ * cifra (perche' la config deve essere sempre valida) ma **entra nella tendina**
+ * solo quando la scrittura e' finita. Fossero lo stesso momento, digitare 5577
+ * lascerebbe in elenco anche 5, 55 e 557.
  */
 class ConfigViewModel(
     private val configStore: IConfigStore,
@@ -58,6 +83,7 @@ class ConfigViewModel(
                 config = config,
                 portText = config.port.toString(),
                 delayText = config.responseDelayMs.toString(),
+                knownPorts = configStore.knownPorts.value,
             )
         }
     )
@@ -65,10 +91,16 @@ class ConfigViewModel(
 
     init {
         viewModelScope.launch {
-            combine(configStore.config, serverController.state) { config, state ->
-                config to state.isActive
-            }.collect { (config, isRunning) ->
-                _uiState.update { it.copy(config = config, isServerRunning = isRunning) }
+            combine(
+                configStore.config,
+                configStore.knownPorts,
+                serverController.state,
+            ) { config, ports, state ->
+                Triple(config, ports, state.isActive)
+            }.collect { (config, ports, isRunning) ->
+                _uiState.update {
+                    it.copy(config = config, knownPorts = ports, isServerRunning = isRunning)
+                }
             }
         }
     }
@@ -85,17 +117,26 @@ class ConfigViewModel(
             is ConfigAction.PortChanged -> {
                 val digits = action.text.filter { it.isDigit() }.take(5)
                 _uiState.update { it.copy(portText = digits) }
-                digits.toIntOrNull()?.takeIf { it in 1..65535 }?.let { port ->
+                digits.toIntOrNull()?.takeIf { it in PORT_RANGE }?.let { port ->
                     persist { it.copy(port = port) }
                 }
             }
+
+            is ConfigAction.PortPicked -> {
+                _uiState.update { it.copy(portText = action.port.toString()) }
+                persist { it.copy(port = action.port) }
+            }
+
+            ConfigAction.PortCommitted -> commitPort()
+
+            is ConfigAction.PortForgotten -> configStore.forgetPort(action.port)
 
             is ConfigAction.OutcomeSelected -> persist { it.copy(defaultOutcome = action.outcome) }
 
             is ConfigAction.DelayChanged -> {
                 val digits = action.text.filter { it.isDigit() }.take(6)
                 _uiState.update { it.copy(delayText = digits) }
-                digits.toLongOrNull()?.takeIf { it in 0..600_000 }?.let { delay ->
+                digits.toLongOrNull()?.takeIf { it in DELAY_RANGE }?.let { delay ->
                     persist { it.copy(responseDelayMs = delay) }
                 }
             }
@@ -109,6 +150,20 @@ class ConfigViewModel(
 
             is ConfigAction.RawHexChanged -> persist { it.copy(rawReplyHex = action.text) }
         }
+    }
+
+    /**
+     * Ultima rete di sicurezza: chi scrive una porta e chiude l'app senza
+     * togliere il fuoco dal campo se la ritroverebbe comunque in tendina.
+     */
+    override fun onCleared() {
+        commitPort()
+    }
+
+    private fun commitPort() {
+        _uiState.value.portText.toIntOrNull()
+            ?.takeIf { it in PORT_RANGE }
+            ?.let(configStore::rememberPort)
     }
 
     private fun persist(transform: (ServerConfig) -> ServerConfig) {

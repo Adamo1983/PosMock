@@ -42,7 +42,8 @@ class OutcomeProviderImpl(
         return decisionMutex.withLock {
             val deferred = CompletableDeferred<MockOutcome>()
             waiters[request.id] = deferred
-            _pending.value = PendingDecision(request, config.defaultOutcome)
+            _pending.value =
+                PendingDecision(request, config.defaultOutcome, config.responseDelayMs)
             try {
                 deferred.await()
             } finally {

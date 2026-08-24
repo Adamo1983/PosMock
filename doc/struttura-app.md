@@ -1,7 +1,7 @@
 # Struttura dell'app PosMock
 
 > Mappa dell'architettura per riprendere il contesto senza rileggere il codice.
-> Ultimo aggiornamento: 15/08/2026 (v1.0)
+> Ultimo aggiornamento: 24/08/2026 (v1.0)
 
 ## Cos'e'
 
@@ -123,6 +123,25 @@ scrive, Stato legge. Ne segue una proprieta' comoda — un valore non valido res
 testo e non viene mai persistito, quindi il riepilogo mostra sempre una configurazione con cui
 si puo' davvero partire, e non serve nessuna validazione nella schermata Stato.
 
+La **porta** si batte a mano oppure si sceglie dalla tendina appesa alla freccia del campo: le
+porte gia' usate restano in elenco (`IConfigStore.knownPorts`, persistite a parte dalla
+configurazione) e le due di serie ci sono sempre e non si possono togliere, perche' sono quelle di
+`posList.cfg` e della pagina hardware di Giano. Le altre si tolgono con la X nella riga, tranne
+quella in uso: quella il campo la rimetterebbe in elenco al primo cambio di fuoco, e una X che non
+toglie niente sembra un difetto.
+
+⚠️ Le due di serie sono etichettate con la **marca**, non col protocollo (`TerminalBrand`:
+Ingenico 5577, CCV 20007). La porta e' del terminale, non del protocollo che ci parla sopra — un
+Ingenico sta sulla 5577 sia in ZVT sia in IAE37, e la coppia "Ingenico + ZVT" e' reale. Resta
+invece legata al protocollo la porta **proposta** quando si cambia protocollo
+(`MockProtocol.defaultPort`): e' un'ipotesi comoda, e chi ha l'altra marca la corregge dalla
+tendina in un tocco.
+
+Il momento in cui una porta scritta a mano **entra** in elenco non e' quello in cui cambia la
+configurazione: la config si aggiorna a ogni cifra digitata, cosi' resta sempre valida, mentre
+l'elenco cambia solo quando il campo perde il fuoco o arriva "Fine" dalla tastiera. Fossero lo
+stesso momento, battere 5577 lascerebbe in tendina anche 5, 55 e 557.
+
 ⚠️ Le modifiche **non** vengono bloccate col servizio acceso (si prepara la prossima prova
 mentre gira quella in corso), ma porta e protocollo valgono dal prossimo avvio: lo dice un
 banner in Configura e una riga nel riepilogo. Senza quell'avviso si cambia porta e ci si chiede
@@ -214,6 +233,20 @@ interessante.
 Il **ritardo** configurabile si applica solo all'autorizzazione, non alla registrazione: sulla
 registrazione il middleware molla dopo 5s, quindi un ritardo la' significherebbe soltanto
 "POS occupato" a ogni prova, nascondendo i test veri.
+
+Il ritardo vale in **tutt'e due** le modalita', e sta in `awaitResponseDelay` (in
+`ProtocolHandler.kt`, uno solo per i due protocolli). Viene consumato **dopo** che l'esito e'
+stato deciso e prima di mandarlo sul filo: col preset non cambia niente — li' `decide()` torna
+senza sospendere, quindi "prima" e "dopo" sono lo stesso istante — mentre in manuale il dialog
+compare subito (deve: l'ACK e' gia' partito e il middleware non aspetta) e l'attesa parte dalla
+scelta. Cosi' si sceglie mentre si ricorda ancora quale prova si sta facendo, e il ritardo e' una
+coda che parte da un istante noto invece che tempo morto davanti a uno schermo fermo.
+
+⚠️ In manuale l'attesa **totale** che vede la cassa e' quindi il tempo di scelta **piu'** il
+ritardo configurato, e vale anche per gli esiti muti: "ACK e poi silenzio" scelto con 30 s di
+ritardo tace 30 s piu' tardi (sullo ZVT coperto dal keep-alive, su IAE37 no). Il dialog scrive il
+ritardo che scattera', altrimenti si tocca un esito e per qualche secondo non succede niente —
+cioe' il sintomo che questa app serve a indagare, prodotto per sbaglio sul banco.
 
 ⚠️ **Il ritardo non serve piu' a simulare un silenzio lungo.** Da quando c'e' il keep-alive
 (17/08/2026), sullo ZVT l'attesa e' coperta da un `04 FF` ogni 10 s: i timeout che misurano il
