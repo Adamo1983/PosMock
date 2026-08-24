@@ -226,10 +226,10 @@ Chi molla e dopo quanto, letto nel codice e non nei commenti:
 
 | tratta | valore | misura | dove |
 |---|---|---|---|
-| Ermes → middleware | **90 s** | durata | `PosManagementViewModel.kt:951` (`PAYMENT_TIMEOUT_SECONDS`) |
-| middleware → POS, ZVT | **nessuno** | — | `ZvtBridge.cs:117` e' `Task.Delay(Timeout.Infinite)` |
-| middleware → POS, IAE37 | **60 s** | durata | `PosManagerServer.cs:830` (`BridgePaymentBusinessTimeoutMs`) |
-| libreria ZVT, slave mode | 180 s | **silenzio** | `NetworkTransport.cs:40` |
+| Ermes → middleware | **promessa del middleware + 15 s** (210 s se assente) | durata | `ResolvePosPaymentTimeoutUseCase.kt`; la promessa e' `maxAnswerSeconds` di `GET /pos?v=2` |
+| middleware → POS, ZVT | **attesa configurata + 20 s** (default 200) | **silenzio** (riparte a ogni `04 FF`) + tetto assoluto 900 s | `ZvtBridge.cs` (`SilenceSafetyMarginMs`, `PaymentAbsoluteTimeoutMs`) |
+| middleware → POS, IAE37 | **attesa configurata**, mai sotto 90 s | durata | `PosInfo.posAnswerTimeoutSeconds` (30-900, default 180) → `Iae37Bridge.PerReadSeconds` (clamp 30-300 s/lettura ×3) |
+| libreria ZVT, slave mode | **attesa configurata** (180 s se non configurata) | **silenzio** (riparte a ogni pacchetto) | `NetworkTransport.cs:40`, nodo `SlaveModeTimeout` passato da `ZvtBridge.BuildConfigXml` |
 | Giano → POS, finestra asporto | **150 s** | durata | `FinalizeOrderWindowVM.cs:74` |
 | Giano → POS, watchdog device | 200 s | **silenzio** | `IngenicoZvtA32deCreditCardTerminalDevice.cs:47` |
 | Giano → POS, tetto assoluto | **900 s** | durata | idem, `:51` |

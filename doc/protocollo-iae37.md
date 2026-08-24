@@ -14,7 +14,7 @@ Il tracciato qui sotto e' stato **ricostruito dai trace della DLL** (`*-iaedll-l
 registrano `Data Tx` / `Data Rx` in esadecimale) di terminali veri: un DESK3200 il 12/08/2026 e
 altri due nel 2024-2025.
 
-⚠️ **La cosa che rende affidabile la ricostruzione e' la verifica incrociata**: le lunghezze dei
+⚠️ **La cosa che rende affidabile la ricostruzione è la verifica incrociata**: le lunghezze dei
 campi dedotte dai byte combaciano con le strutture dichiarate nella specifica
 (`TransactionResult[2+1]`, `KODescription[24+1]`, ProductNumber 33, SerialNumber 18,
 InfoRelease 80) e la loro somma da' **esattamente** i 225 byte del payload catturato. Due fonti
@@ -77,9 +77,10 @@ cassa → 02 …0P … 03 LRC      ← 06 03 7A            ACK
 
 ## Perche' lo status e' il guardiano
 
-`Iae37Bridge` chiama `StatoPos` con un timeout di **5 secondi prima di ogni pagamento**. Se non
-riceve una risposta valida, restituisce `PosBusy` e **il pagamento non parte nemmeno**: la
-richiesta `P` non viene mai mandata. Finche' il mock non rispondeva a `t`, di IAE37 non si
+`Iae37Bridge` chiama `StatoPos` **prima di ogni pagamento** (budget nominale 5 s nel padre; alla
+DLL arriva il minimo che accetta, 30 s per lettura — su un POS sano lo status torna in 1-2 s e il
+numero non si vede). Se non riceve una risposta valida, restituisce `PosBusy` e **il pagamento
+non parte nemmeno**: la richiesta `P` non viene mai mandata. Finche' il mock non rispondeva a `t`, di IAE37 non si
 poteva provare nient'altro — e nel log non compariva neppure l'importo, perche' lo status non lo
 porta.
 
@@ -87,9 +88,11 @@ porta.
 non c'e' nessun pre-flight da 5 secondi: Giano applica `IAE37_SetTimeout` una volta sola, dentro
 `CreateAndInitializeWrapper` (`IngenicoIAE37CreditCardTerminalDevice.cs:120`), quindi lo **stesso**
 timeout vale per ogni operazione sulla DLL, `StatoPos` compreso. Il valore e'
-`PaymentReadTimeoutSeconds = 60` — sessanta **secondi** per lettura, per tre letture: 180s, che
-devono restare sotto il watchdog dei 200s (`PaymentTimeoutMs`). Conseguenza pratica: uno status
-muto che sul middleware costa 5 secondi, su Giano ne costa fino a 180.
+`PaymentReadTimeoutSeconds` = attesa configurata del terminale / 3, riportato nel range 30-300
+che la DLL accetta — col default di 180 s sono sessanta **secondi** per lettura, per tre
+letture: 180s, sotto il watchdog (`PaymentTimeoutMs`, mai meno di 200s). Conseguenza pratica: uno
+status muto che sul middleware costa al massimo 90 secondi (minimo della DLL ×3), su Giano ne
+costa fino a 180 col default.
 
 > Attenzione all'unita' se si va a leggere il wrapper: il parametro si chiama
 > `SetTimeout(int timeoutMs)` (`IAE37Wrapper.cs:431`) ma il commento sopra dice che la DLL vuole

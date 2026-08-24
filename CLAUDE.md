@@ -46,10 +46,13 @@ giorno: cronaca in `../ermes-jetpack-compose/doc/analisi-pagamento-pos-orfano.md
 
 - **Lo status legge `defaultOutcome`, non la scelta del dialog.** Con "Chiedi ogni volta" attivo,
   quello che tocchi nel dialog governa **solo il pagamento**: `handleStatus` guarda l'esito
-  *predefinito* nelle impostazioni. Il 21/08 il predefinito era rimasto su "Chiude la
-  connessione" mentre dal dialog si sceglieva "ACK e poi silenzio" — risultato: il pre-flight
-  moriva prima che il dialog comparisse, e per un quarto d'ora tutto rispondeva "POS occupato"
-  senza che nel log del mock comparisse una sola riga `Richiesta pagamento`.
+  *predefinito* nelle impostazioni. Il 21/08, dopo il pagamento delle 14:54 ("ACK e poi silenzio"
+  scelto nel dialog), il predefinito è stato portato su "Chiude la connessione" dalla lista in
+  Configurazione — l'unico posto che lo scrive; il dialog non tocca la config — e da lì il
+  pre-flight moriva prima che il dialog comparisse: per un quarto d'ora tutto rispondeva "POS
+  occupato" senza che nel log del mock comparisse una sola riga `Richiesta pagamento`. Il cambio
+  vale dalla connessione successiva senza riavviare il server (la config è riletta a ogni
+  richiesta; protocollo e porta invece sono congelati all'avvio).
 - **Con `Nessuna risposta` o `Chiude la connessione` come predefinito non si prova più niente**:
   il middleware non supera mai il pre-flight, quindi *qualunque* scenario si volesse provare
   diventa "POS occupato". Per `NoAck` è voluto e realistico (un POS occupato dal cassiere davvero

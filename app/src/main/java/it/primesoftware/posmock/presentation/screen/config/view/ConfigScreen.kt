@@ -182,9 +182,10 @@ private fun OutcomeCard(uiState: ConfigUiState, onAction: (ConfigAction) -> Unit
             supportingText = {
                 Text(
                     if (uiState.isDelayValid) {
-                        "Serve alla transazione lenta ma viva:" +
-                            "Ermes 180 sec. hardcoded, Giano 180 sec. default quando si registra il dispositivo.\n" +
-                            "UniquePosManager -> default 180 sec."
+                        "Serve alla transazione lenta ma viva. Chi aspetta quanto: " +
+                            "UniquePosManager l'attesa configurata sul POS (default 180 s), " +
+                            "Ermes la promessa del middleware (GET /pos?v=2) + 15 s, " +
+                            "Giano 180 s default alla registrazione del dispositivo."
                     } else {
                         "Valore non valido (0-600000): resta quello di prima"
                     }
