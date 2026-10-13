@@ -78,7 +78,7 @@ perche' li' sopra la libreria non c'e' nessun middleware ma la cassa stessa:
 | dopo l'ACK della registrazione | riga a log a 5s **ma nessuna risposta** finche' l'`initTask` non rientra | 180s **per ogni tentativo di connessione**, poi riprova da capo |
 
 I due piani di prova sono `../UniquePosManager/doc/piano-test-1.0.3.md` §8 (T8.1/T8.2/T8.3) e
-`../GianoITA/Docs/TEST-POS-TIMEOUT.md` (A1/A2/A4/A5/A7). Non sono doppioni: e' la stessa
+`TEST-POS-TIMEOUT.md` di GianoITA (cancellato il 13/10/2026, in git: `git show b6e0013:Docs/test-vecchi/TEST-POS-TIMEOUT.md`) (A1/A2/A4/A5/A7). Non sono doppioni: e' la stessa
 libreria vista da due chiamanti che sbagliano in modo diverso.
 
 > **Aggiornamento 16-17/08/2026.** In slave mode la libreria non aspetta piu' per sempre:
@@ -86,7 +86,7 @@ libreria vista da due chiamanti che sbagliano in modo diverso.
 > `RS232Transport`), e la DLL aggiornata e' anche in `UniquePosManager/Libs/`. Il difetto
 > nasceva da un `Timeout.Infinite` che teneva il chiamante appeso e lasciava il terminale
 > "occupato" fino al riavvio dell'applicazione: vedi
-> `../GianoITA/Docs/BUGFIX-POS-OCCUPATO-ZVT.md`.
+> `BUGFIX-POS-OCCUPATO-ZVT.md` di GianoITA (cancellato il 13/10/2026, in git: `git show b6e0013:Docs/bugfix-vecchi/BUGFIX-POS-OCCUPATO-ZVT.md`).
 >
 > **Quel timeout misura il silenzio, non la durata**: riparte a ogni pacchetto ricevuto. E'
 > il motivo per cui il mock manda un keep-alive durante le attese lunghe (sotto): senza,

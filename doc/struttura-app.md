@@ -8,7 +8,7 @@
 Simulatore di terminale POS. Apre un `ServerSocket` sulla porta scelta e serve le connessioni
 di chi lo interroga come farebbe un terminale vero: il middleware (UniquePosManager /
 PosManagerKtorDe) **oppure Giano direttamente**, che al terminale ci parla anche senza
-middleware e ha un piano di prova suo (`../GianoITA/Docs/TEST-POS-TIMEOUT.md`). Due
+middleware e ha un piano di prova suo (`TEST-POS-TIMEOUT.md` di GianoITA (cancellato il 13/10/2026, in git: `git show b6e0013:Docs/test-vecchi/TEST-POS-TIMEOUT.md`)). Due
 protocolli **entrambi simulati**, ZVT e IAE37 (vedi "I tre protocolli"); la modalita' `raw`
 registra soltanto, ed e' lo strumento con cui IAE37 e' stato ricostruito.
 
@@ -273,9 +273,10 @@ e' quello della libreria. Su IAE37, all'opposto, il mock non manda keep-alive
 (`Iae37TerminalHandler`), quindi li' il ritardo e' silenzio per davvero.
 
 ⚠️ **Giano parla al POS anche senza middleware**, e ha un piano di prova suo che usa questa app:
-`../GianoITA/Docs/TEST-POS-TIMEOUT.md`. I quattro valori qui sopra stanno pero' su
-`feature/prenotazioni` e `feature/datev`: su `main` la libreria ha ancora `Timeout.Infinite` in
-slave mode e i tetti del device non esistono.
+`TEST-POS-TIMEOUT.md` di GianoITA (cancellato il 13/10/2026, in git: `git show b6e0013:Docs/test-vecchi/TEST-POS-TIMEOUT.md`). I quattro valori qui sopra sono in `main`
+dalla 2.1.0 (fix `f39d523`, arrivato col merge di `feature/prenotazioni`, che non esiste piu') e
+anche su `feature/datev`; solo le versioni prima della 2.1.0 hanno ancora `Timeout.Infinite` in
+slave mode e nessun tetto del device.
 
 ## I tre protocolli
 

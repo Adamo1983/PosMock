@@ -14,7 +14,7 @@ Giano (cassa) ──────────────────────
 middleware, che ha timeout suoi; la tratta diretta no — li' la cassa parla al terminale con la
 `CardTerminalLibrary` (ZVT) o con la DLL Ingenico (IAE37), e i tempi sono altri. Ognuna ha il
 suo piano di prova: `../UniquePosManager/doc/piano-test-1.0.3.md` e
-`../GianoITA/Docs/TEST-POS-TIMEOUT.md`. **Vanno provate tutte e due**: a parita' di guasto
+`TEST-POS-TIMEOUT.md` di GianoITA (cancellato il 13/10/2026, in git: `git show b6e0013:Docs/test-vecchi/TEST-POS-TIMEOUT.md`). **Vanno provate tutte e due**: a parita' di guasto
 raccontano storie diverse.
 
 Serve a provare il percorso di pagamento senza terminale fisico, e soprattutto a **riprodurre
